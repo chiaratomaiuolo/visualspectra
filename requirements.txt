@@ -1,0 +1,7 @@
+# Python version requirements
+python_version >= 3.11
+# Python package requirements
+matplotlib
+numpy
+scipy
+uproot
