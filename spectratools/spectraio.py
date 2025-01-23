@@ -107,9 +107,30 @@ def import_from_root(file_path: str | os.PathLike, treename: str='Data_R') -> np
     spectrum = tree['Energy'].array()
     # Converting to np.arrays...
     spectrum = np.array(spectrum) 
-    print(spectrum[0:100])
     # ... and returning it	
     return spectrum
+
+def check_file_format(file_path: str | os.PathLike) -> str:
+    """Check the file format of a given file.
+
+    Parameters
+    ----------
+    file_path : str | os.PathLike
+        Path to the file.
+
+    Returns
+    -------
+    file_format : str
+        The format of the file.
+    """
+    if file_path.endswith('.txt'):
+        return 'txt'
+    elif file_path.endswith('.csv'):
+        return 'csv'
+    elif file_path.endswith('.root'):
+        return 'root'
+    else:
+        raise ValueError("File format not supported.")
 
 def import_spectrum(file_path: str | os.PathLike, **kwargs) -> Tuple[np.array, np.array]:
     if file_path.endswith('.txt'):
