@@ -1,1 +1,1 @@
-# spectratool init
+# spectratools init
