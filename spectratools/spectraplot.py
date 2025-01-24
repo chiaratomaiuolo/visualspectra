@@ -46,16 +46,19 @@ class SpectraPlotter(ttk.Window):
         self.toolbar = NavigationToolbar2Tk(self.canvas, self)
         self.toolbar.update()
         self.toolbar.pack(side=ttk.TOP, fill=ttk.X)
-
+        # Add spectrum button
         self.plot_spectra()
         self.add_button = ttk.Button(self, text="Add Spectrum", command=self.add_spectra)
         self.add_button.place(x=10, y=10)
-
+        # Rebin spectrum button
         self.rebin_button = ttk.Button(self, text="Rebin Spectrum", bootstyle='success', command=self.rebin_spectra)
         self.rebin_button.place(x=120, y=10)
-
+        # Select current spectrum button
         self.select_button = ttk.Button(self, text="Select current spectrum", bootstyle='default', command=self.select_spectrum)
         self.select_button.place(x=240, y=10)
+        # Delete opened file button
+        self.delete_button = ttk.Button(self, text="Close spectrum", bootstyle='danger', command=self.delete_file)
+        self.delete_button.place(x=400, y=10)
 
     def plot_spectra(self, file_path: str = None):
         if not file_path: # If a file path is not provided, plot (or re-plot) all opened files
@@ -173,6 +176,36 @@ class SpectraPlotter(ttk.Window):
                 Messagebox.show_warning("Warning", "Please select a file.")
                 
         apply_button = ttk.Button(select_window, text="Apply", command=apply_selection)
+        apply_button.pack(pady=10)
+
+    def delete_file(self):
+        if not self.file_paths:
+            Messagebox.show_warning("Warning", "No file selected.")
+            return
+        # Create a new window for rebinning
+        delete_window = ttk.Toplevel(self)
+        delete_window.title("Delete Spectrum")
+        delete_window.geometry("300x250")
+
+        ttk.Label(delete_window, text="Select File:").pack(pady=10)
+        file_delete = ttk.StringVar(delete_window)
+        file_menu_delete = ttk.Combobox(delete_window, textvariable=file_delete, values=self.file_paths)
+        file_menu_delete.pack(pady=10)
+
+        def apply_deletion():
+            selected_file = file_delete.get()
+            if selected_file:
+                self.file_paths.remove(selected_file)
+                if selected_file in self.histograms:
+                    for patch in self.histograms[selected_file]:
+                        patch.remove()
+                    del self.histograms[selected_file]
+                self.plot_spectra()
+                delete_window.destroy()
+            else:
+                Messagebox.show_warning("Warning", "Please select a file.")
+                
+        apply_button = ttk.Button(delete_window, text="Apply", command=apply_deletion)
         apply_button.pack(pady=10)
 
     def on_closing(self):
