@@ -6,8 +6,10 @@ from ttkbootstrap.dialogs import Messagebox
 # ... then installed libraries...
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from matplotlib.widgets import SpanSelector
 import numpy as np
 # ... and eventually local modules
+import spectratools.spectraanalysis as analysis_utils
 import spectratools.spectraio as io_utils
 
 class SpectraPlotter(ttk.Window):
@@ -21,6 +23,8 @@ class SpectraPlotter(ttk.Window):
         # to the last file in the list
         if len(self.file_paths) != 0:
             self.current_file = self.file_paths[-1]
+        # Line to follow the cursor
+        self.cursor_line = None
         # Saving possible additional arguments
         if kwargs:
             self.kwargs_keys = []
@@ -59,6 +63,23 @@ class SpectraPlotter(ttk.Window):
         # Delete opened file button
         self.delete_button = ttk.Button(self, text="Close spectrum", bootstyle='danger', command=self.delete_file)
         self.delete_button.place(x=400, y=10)
+
+        # Adding SpanSelector for interval selection
+        self.span = SpanSelector(self.ax, self.onselect, 'horizontal', useblit=True,
+                                 handle_props=dict(alpha=0.5, facecolor='red'))
+        self.span.set_active(False)  # Initially deactivate the SpanSelector
+
+        # Add interval selection button
+        self.interval_button = ttk.Button(self, text="Select Interval", bootstyle='info', command=self.toggle_span_selector)
+        self.interval_button.place(x=520, y=10)
+
+        # Connect the motion notify event
+        self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
+        # Connect the key press event
+        self.canvas.mpl_connect('key_press_event', self.on_key_press)
+
+        # Set focus to the canvas to capture key events
+        self.canvas.get_tk_widget().focus_set()
 
     def plot_spectra(self, file_path: str = None):
         if not file_path: # If a file path is not provided, plot (or re-plot) all opened files
@@ -103,6 +124,38 @@ class SpectraPlotter(ttk.Window):
             self.ax.grid(True)
             self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
+
+    def onselect(self, xmin, xmax):
+        """Callback function to handle the selection of an interval."""
+        analysis_utils.onselect(xmin, xmax)
+        self.ax.axvline(x=xmin, color='red', linestyle='--')
+        self.ax.axvline(x=xmax, color='red', linestyle='--')
+        self.canvas.draw()
+
+    def toggle_span_selector(self):
+        """Toggle the activation of the SpanSelector."""
+        self.span.set_active(not self.span.active)
+        if self.span.active:
+            self.cursor_line = self.ax.axvline(color='gray', linestyle='--')
+        else:
+            if self.cursor_line:
+                self.cursor_line.remove()
+                self.cursor_line = None
+        self.canvas.draw()
+
+    def on_mouse_move(self, event):
+        """Handle the mouse move event to update the cursor line."""
+        if self.span.active and event.inaxes == self.ax:
+            if self.cursor_line:
+                self.cursor_line.set_xdata([event.xdata])
+            else:
+                self.cursor_line = self.ax.axvline(x=event.xdata, color='gray', linestyle='--')
+            self.canvas.draw()
+
+    def on_key_press(self, event):
+        """Handle the key press event to deactivate the SpanSelector on Esc key press."""
+        if event.key == 'escape' and self.span.active:
+            self.toggle_span_selector()
 
     def add_spectra(self):
         file_path = filedialog.askopenfilename(title="Select a file", filetypes=[("ROOT files", "*.root"), ("CSV files", "*.csv"), ("TXT files", "*.txt")])
@@ -151,7 +204,7 @@ class SpectraPlotter(ttk.Window):
 
         apply_button = ttk.Button(rebin_window, text="Apply", command=apply_rebin)
         apply_button.pack(pady=10)
-    
+
     def select_spectrum(self):
         if not self.file_paths:
             Messagebox.show_warning("Warning", "No files to rebin.")

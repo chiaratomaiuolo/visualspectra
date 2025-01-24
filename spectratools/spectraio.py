@@ -13,8 +13,8 @@ from typing import Tuple
 # ... then installed libraries...
 import matplotlib.pyplot as plt
 import numpy as np
-# ... and eventually local modules
 import uproot
+# ... and eventually local modules
 
 
 def create_parser() -> argparse.ArgumentParser:
