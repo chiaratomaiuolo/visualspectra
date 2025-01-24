@@ -1,3 +1,5 @@
+"""Utilities for GUI creation and spectral plot
+"""
 # System libraries first...
 import os
 from tkinter import filedialog
