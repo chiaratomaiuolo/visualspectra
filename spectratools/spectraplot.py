@@ -35,14 +35,14 @@ class SpectraPlotter(ttk.Window):
         self.histograms = {}
         # Initializing the spectrum window
         self.initialize_ui()
-    
+
     def process_kwargs(self, kwargs):
         """ Keyword arguments handling for SpectraPlotter class when passed
             to an istance constructor.
         """
         for key, value in kwargs.items():
-                setattr(self, key, value)
-                self.kwargs_keys.append(key)
+            setattr(self, key, value)
+            self.kwargs_keys.append(key)
 
     def initialize_ui(self):
         """ User Interface initialization for SpectraPlotter class.
@@ -64,22 +64,26 @@ class SpectraPlotter(ttk.Window):
         self.add_button = ttk.Button(self, text="Add Spectrum", command=self.add_spectra)
         self.add_button.place(x=10, y=10)
         # Rebin spectrum button
-        self.rebin_button = ttk.Button(self, text="Rebin Spectrum", bootstyle='success', command=self.rebin_spectra)
+        self.rebin_button = ttk.Button(self, text="Rebin Spectrum", bootstyle='success',\
+                                       command=self.rebin_spectra)
         self.rebin_button.place(x=120, y=10)
         # Select current spectrum button
-        self.select_button = ttk.Button(self, text="Select current spectrum", bootstyle='default', command=self.select_spectrum)
+        self.select_button = ttk.Button(self, text="Select current spectrum", bootstyle='default',\
+                                        command=self.select_spectrum)
         self.select_button.place(x=240, y=10)
         # Delete opened file button
-        self.delete_button = ttk.Button(self, text="Close spectrum", bootstyle='danger', command=self.delete_file)
+        self.delete_button = ttk.Button(self, text="Close spectrum", bootstyle='danger',\
+                                        command=self.delete_file)
         self.delete_button.place(x=400, y=10)
         # Interval selection button
         # Adding SpanSelector for interval selection
         self.span = SpanSelector(self.ax, self.onselect, 'horizontal', useblit=True,
-                                 handle_props=dict(alpha=0.5, facecolor='red'))
+                                 handle_props={"alpha":0.5, "facecolor":'red'})
         self.span.set_active(False)  # Initially deactivate the SpanSelector
 
         # Add interval selection button
-        self.interval_button = ttk.Button(self, text="Select Interval", bootstyle='info', command=self.toggle_span_selector)
+        self.interval_button = ttk.Button(self, text="Select Interval", bootstyle='info',\
+                                          command=self.toggle_span_selector)
         self.interval_button.place(x=520, y=10)
         # Connect the motion notify event
         self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
@@ -100,16 +104,18 @@ class SpectraPlotter(ttk.Window):
             for file in self.file_paths:
                 try:
                     spectrum = io_utils.import_spectrum(file, treename=self.treename)
-                    hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6, label=f'{os.path.basename(file)}')
+                    hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6,\
+                                        label=f'{os.path.basename(file)}')
                     self.histograms[file] = hist[2]  # Save the patches (rectangles) of the histogram
-                except FileNotFoundError as e:
+                except FileNotFoundError:
                     Messagebox.show_warning("Warning", f"File {file} not found.")
 
             # Update legend with custom colors
             handles, labels = self.ax.get_legend_handles_labels()
-            label_colors = ['red' if self.file_paths[i] == self.current_file else 'black' for i in range(len(labels))]
+            label_colors = ['red' if self.file_paths[i] == self.current_file\
+                            else 'black' for i in range(len(labels))]
             self.ax.legend(handles, labels, labelcolor=label_colors)
-            
+
             self.ax.grid(True)
             self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
@@ -120,25 +126,30 @@ class SpectraPlotter(ttk.Window):
                         patch.remove()
                     del self.histograms[file_path]
                 spectrum = io_utils.import_spectrum(file_path, treename=self.treename)
-                hist = self.ax.hist(spectrum, bins=self.nbins, label=f'{os.path.basename(file_path)}')
-                self.histograms[file_path] = hist[2]  # Save the patches (rectangles) of the histogram
-            except FileNotFoundError as e:
+                hist = self.ax.hist(spectrum, bins=self.nbins,\
+                                    label=f'{os.path.basename(file_path)}')
+                self.histograms[file_path] = hist[2]  # Save the patches of the histogram
+            except FileNotFoundError:
                 Messagebox.show_warning("Warning", f"File {file_path} not found.")
 
             # Update legend with custom colors
             handles, labels = self.ax.get_legend_handles_labels()
-            label_colors = ['red' if self.file_paths[i] == self.current_file else 'black' for i in range(len(labels))]
+            label_colors = ['red' if self.file_paths[i] == self.current_file\
+                            else 'black' for i in range(len(labels))]
             self.ax.legend(handles, labels, labelcolor=label_colors)
-            
+
             self.ax.grid(True)
             self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
-    
+
     # -------------- BUTTON DEFINITION FUNCTIONS --------------
 
     # -------------- ADD SPECTRA BUTTON --------------
     def add_spectra(self):
-        file_path = filedialog.askopenfilename(title="Select a file", filetypes=[("ROOT files", "*.root"), ("CSV files", "*.csv"), ("TXT files", "*.txt")])
+        file_path = filedialog.askopenfilename(title="Select a file", \
+                                               filetypes=[("ROOT files", "*.root"),\
+                                                          ("CSV files", "*.csv"),\
+                                                          ("TXT files", "*.txt")])
         if file_path:
             self.current_file = file_path
             self.file_paths.append(file_path)
@@ -164,7 +175,8 @@ class SpectraPlotter(ttk.Window):
 
         ttk.Label(rebin_window, text="Select Number of Bins:").pack(pady=10)
         bins_var = ttk.IntVar(rebin_window)
-        bins_menu = ttk.Combobox(rebin_window, textvariable=bins_var, values=[128, 256, 512, 1024, 2048, 4096])
+        bins_menu = ttk.Combobox(rebin_window, textvariable=bins_var,\
+                                values=[128, 256, 512, 1024, 2048, 4096])
         bins_menu.pack(pady=10)
 
         def apply_rebin():
@@ -197,7 +209,8 @@ class SpectraPlotter(ttk.Window):
 
         ttk.Label(select_window, text="Select File:").pack(pady=10)
         file_select = ttk.StringVar(select_window)
-        file_menu_select = ttk.Combobox(select_window, textvariable=file_select, values=self.file_paths)
+        file_menu_select = ttk.Combobox(select_window, textvariable=file_select,\
+                                        values=self.file_paths)
         file_menu_select.pack(pady=10)
 
         def apply_selection():
@@ -208,7 +221,7 @@ class SpectraPlotter(ttk.Window):
                 select_window.destroy()
             else:
                 Messagebox.show_warning("Warning", "Please select a file.")
-                
+
         apply_button = ttk.Button(select_window, text="Apply", command=apply_selection)
         apply_button.pack(pady=10)
     # -------------- DELETE FILE BUTTON --------------
@@ -223,7 +236,8 @@ class SpectraPlotter(ttk.Window):
 
         ttk.Label(delete_window, text="Select File:").pack(pady=10)
         file_delete = ttk.StringVar(delete_window)
-        file_menu_delete = ttk.Combobox(delete_window, textvariable=file_delete, values=self.file_paths)
+        file_menu_delete = ttk.Combobox(delete_window, textvariable=file_delete,\
+                                        values=self.file_paths)
         file_menu_delete.pack(pady=10)
 
         def apply_deletion():
@@ -238,7 +252,7 @@ class SpectraPlotter(ttk.Window):
                 delete_window.destroy()
             else:
                 Messagebox.show_warning("Warning", "Please select a file.")
-                
+
         apply_button = ttk.Button(delete_window, text="Apply", command=apply_deletion)
         apply_button.pack(pady=10)
 
@@ -267,7 +281,8 @@ class SpectraPlotter(ttk.Window):
             if self.cursor_line:
                 self.cursor_line.set_xdata([event.xdata])
             else:
-                self.cursor_line = self.ax.axvline(x=event.xdata, color='gray', linestyle='--')
+                self.cursor_line = self.ax.axvline(x=event.xdata, color='gray',\
+                                                   linestyle='--')
             self.canvas.draw()
 
     def on_key_press(self, event):
