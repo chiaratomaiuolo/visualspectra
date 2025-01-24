@@ -4,4 +4,6 @@ python_version >= 3.11
 matplotlib
 numpy
 scipy
+tkinter
+ttkinterbootstrap
 uproot
