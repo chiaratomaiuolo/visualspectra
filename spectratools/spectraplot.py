@@ -19,7 +19,8 @@ class SpectraPlotter(ttk.Window):
         self.file_paths = file_paths
         # Setting the 'current file' for fit purposes
         # to the last file in the list
-        self.current_file = self.file_paths[-1]
+        if len(self.file_paths) != 0:
+            self.current_file = self.file_paths[-1]
         # Saving possible additional arguments
         if kwargs:
             self.kwargs_keys = []
@@ -59,10 +60,14 @@ class SpectraPlotter(ttk.Window):
     def plot_spectra(self, file_path: str = None):
         if not file_path: # If a file path is not provided, plot (or re-plot) all opened files
             self.ax.clear()
+            if len(self.file_paths) == 0:
+                # If there are no files to plot, just opening a white window
+                self.canvas.draw()
+                return
             for file in self.file_paths:
                 try:
                     spectrum = io_utils.import_spectrum(file, treename=self.treename)
-                    hist = self.ax.hist(spectrum, bins=self.nbins, label=f'{os.path.basename(file)}')
+                    hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6, label=f'{os.path.basename(file)}')
                     self.histograms[file] = hist[2]  # Save the patches (rectangles) of the histogram
                 except FileNotFoundError as e:
                     Messagebox.show_warning("Warning", f"File {file} not found.")
