@@ -14,6 +14,8 @@ import spectratools.spectraio as io_utils
 
 class SpectraPlotter(ttk.Window):
     def __init__(self, file_paths: list[str | os.PathLike], **kwargs):
+        """Class constructor
+        """
         super().__init__(themename="flatly")
         # Setting closing protocol
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -35,11 +37,17 @@ class SpectraPlotter(ttk.Window):
         self.initialize_ui()
     
     def process_kwargs(self, kwargs):
+        """ Keyword arguments handling for SpectraPlotter class when passed
+            to an istance constructor.
+        """
         for key, value in kwargs.items():
                 setattr(self, key, value)
                 self.kwargs_keys.append(key)
 
     def initialize_ui(self):
+        """ User Interface initialization for SpectraPlotter class.
+        """
+        # Canvas definition
         self.title("Spectra Plotter")
         self.geometry("1200x800")
         self.figure, self.ax = plt.subplots()
@@ -50,8 +58,9 @@ class SpectraPlotter(ttk.Window):
         self.toolbar = NavigationToolbar2Tk(self.canvas, self)
         self.toolbar.update()
         self.toolbar.pack(side=ttk.TOP, fill=ttk.X)
-        # Add spectrum button
+        # Creating the Matplotlib figure inside the canva
         self.plot_spectra()
+        # -------------- BUTTONS DEFINITION --------------
         self.add_button = ttk.Button(self, text="Add Spectrum", command=self.add_spectra)
         self.add_button.place(x=10, y=10)
         # Rebin spectrum button
@@ -63,7 +72,7 @@ class SpectraPlotter(ttk.Window):
         # Delete opened file button
         self.delete_button = ttk.Button(self, text="Close spectrum", bootstyle='danger', command=self.delete_file)
         self.delete_button.place(x=400, y=10)
-
+        # Interval selection button
         # Adding SpanSelector for interval selection
         self.span = SpanSelector(self.ax, self.onselect, 'horizontal', useblit=True,
                                  handle_props=dict(alpha=0.5, facecolor='red'))
@@ -72,16 +81,16 @@ class SpectraPlotter(ttk.Window):
         # Add interval selection button
         self.interval_button = ttk.Button(self, text="Select Interval", bootstyle='info', command=self.toggle_span_selector)
         self.interval_button.place(x=520, y=10)
-
         # Connect the motion notify event
         self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         # Connect the key press event
         self.canvas.mpl_connect('key_press_event', self.on_key_press)
-
         # Set focus to the canvas to capture key events
         self.canvas.get_tk_widget().focus_set()
 
     def plot_spectra(self, file_path: str = None):
+        """ Method plotting the spectra in the User Interface canva.
+        """
         if not file_path: # If a file path is not provided, plot (or re-plot) all opened files
             self.ax.clear()
             if len(self.file_paths) == 0:
@@ -124,39 +133,10 @@ class SpectraPlotter(ttk.Window):
             self.ax.grid(True)
             self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
+    
+    # -------------- BUTTON DEFINITION FUNCTIONS --------------
 
-    def onselect(self, xmin, xmax):
-        """Callback function to handle the selection of an interval."""
-        analysis_utils.onselect(xmin, xmax)
-        self.ax.axvline(x=xmin, color='red', linestyle='--')
-        self.ax.axvline(x=xmax, color='red', linestyle='--')
-        self.canvas.draw()
-
-    def toggle_span_selector(self):
-        """Toggle the activation of the SpanSelector."""
-        self.span.set_active(not self.span.active)
-        if self.span.active:
-            self.cursor_line = self.ax.axvline(color='gray', linestyle='--')
-        else:
-            if self.cursor_line:
-                self.cursor_line.remove()
-                self.cursor_line = None
-        self.canvas.draw()
-
-    def on_mouse_move(self, event):
-        """Handle the mouse move event to update the cursor line."""
-        if self.span.active and event.inaxes == self.ax:
-            if self.cursor_line:
-                self.cursor_line.set_xdata([event.xdata])
-            else:
-                self.cursor_line = self.ax.axvline(x=event.xdata, color='gray', linestyle='--')
-            self.canvas.draw()
-
-    def on_key_press(self, event):
-        """Handle the key press event to deactivate the SpanSelector on Esc key press."""
-        if event.key == 'escape' and self.span.active:
-            self.toggle_span_selector()
-
+    # -------------- ADD SPECTRA BUTTON --------------
     def add_spectra(self):
         file_path = filedialog.askopenfilename(title="Select a file", filetypes=[("ROOT files", "*.root"), ("CSV files", "*.csv"), ("TXT files", "*.txt")])
         if file_path:
@@ -166,6 +146,7 @@ class SpectraPlotter(ttk.Window):
         else:
             Messagebox.show_error("Error", f"File {file_path} not found.")
 
+    # -------------- REBIN SPECTRA BUTTON --------------
     def rebin_spectra(self):
         if not self.file_paths:
             Messagebox.show_warning("Warning", "No files to rebin.")
@@ -204,7 +185,7 @@ class SpectraPlotter(ttk.Window):
 
         apply_button = ttk.Button(rebin_window, text="Apply", command=apply_rebin)
         apply_button.pack(pady=10)
-
+    # -------------- SELECT SPECTRUM BUTTON --------------
     def select_spectrum(self):
         if not self.file_paths:
             Messagebox.show_warning("Warning", "No files to rebin.")
@@ -230,7 +211,7 @@ class SpectraPlotter(ttk.Window):
                 
         apply_button = ttk.Button(select_window, text="Apply", command=apply_selection)
         apply_button.pack(pady=10)
-
+    # -------------- DELETE FILE BUTTON --------------
     def delete_file(self):
         if not self.file_paths:
             Messagebox.show_warning("Warning", "No file selected.")
@@ -261,6 +242,41 @@ class SpectraPlotter(ttk.Window):
         apply_button = ttk.Button(delete_window, text="Apply", command=apply_deletion)
         apply_button.pack(pady=10)
 
+    # -------------- INTERVAL SELECTION BUTTON --------------
+    def onselect(self, xmin, xmax):
+        """Callback function to handle the selection of an interval."""
+        analysis_utils.onselect(xmin, xmax)
+        self.ax.axvline(x=xmin, color='red', linestyle='--')
+        self.ax.axvline(x=xmax, color='red', linestyle='--')
+        self.canvas.draw()
+
+    def toggle_span_selector(self):
+        """Toggle the activation of the SpanSelector."""
+        self.span.set_active(not self.span.active)
+        if self.span.active:
+            self.cursor_line = self.ax.axvline(color='gray', linestyle='--')
+        else:
+            if self.cursor_line:
+                self.cursor_line.remove()
+                self.cursor_line = None
+        self.canvas.draw()
+
+    def on_mouse_move(self, event):
+        """Handle the mouse move event to update the cursor line."""
+        if self.span.active and event.inaxes == self.ax:
+            if self.cursor_line:
+                self.cursor_line.set_xdata([event.xdata])
+            else:
+                self.cursor_line = self.ax.axvline(x=event.xdata, color='gray', linestyle='--')
+            self.canvas.draw()
+
+    def on_key_press(self, event):
+        """Handle the key press event to deactivate the SpanSelector on Esc key press."""
+        if event.key == 'escape' and self.span.active:
+            self.toggle_span_selector()
+
+
+    # -------------- CLOSING PROTOCOL --------------
     def on_closing(self):
         self.quit()
         self.destroy()
