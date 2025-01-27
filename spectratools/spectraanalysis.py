@@ -22,7 +22,7 @@ def Gauss(x, pars: np.ndarray) -> float:
 def GaussLine(x, pars: np.ndarray) -> float:
     return (pars[0]*x + pars[1]) + pars[2]/pars[4]*np.exp(-(x-pars[3])**2/(2.*pars[4]**2))
 
-
+# ---------------------- Initial parameters computation ----------------------
 def init_computation(content: np.array, bins: np.array) -> List[float]:
     """ Function for the computation of the initial parameters of a Gauss + linear 
         BKG fit inside a ROI.
