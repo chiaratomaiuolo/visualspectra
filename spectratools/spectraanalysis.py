@@ -26,13 +26,13 @@ def GaussLine(x, pars: np.ndarray) -> float:
 def init_computation(content: np.array, bins: np.array) -> List[float]:
     """ Function for the computation of the initial parameters of a Gauss + linear 
         BKG fit inside a ROI.
-        For the Gaussian part:
-        - N = integral of the ROI;
-        - mu = centroid of the ROI;
-        - sigma = std deviation of the ROI.
         For the linear part, taking the first and last point of the ROI:
-        - m = (y[-1]-y[0])/(x[-1]-x[0]);
-        - q = y[0] - m*x[0].
+            - m = (y[-1]-y[0])/(x[-1]-x[0]);
+            - q = y[0] - m*x[0].
+        For the Gaussian part:
+            - N = integral of the ROI;
+            - mu = centroid of the ROI;
+            - sigma = std deviation of the ROI.
     """
     # Computing initial params
     # ------ Gaussian part ------
