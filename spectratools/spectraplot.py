@@ -278,7 +278,8 @@ class SpectraPlotter(ttk.Window):
     def onselect(self, xmin, xmax):
         """Callback function to handle the selection of an interval."""
         # Adding the Tuple containing the ROI limits to the dedicated class attribute
-        self.roi_limits.append((xmin, xmax))
+        new_roi = (xmin, xmax)
+        self.roi_limits.append(new_roi)
         # Creating the ROI mask for further use
         roi_mask = (self.current_spectrum[1] >= xmin) & (self.current_spectrum[1] <= xmax)
         # Defining the roi_binning
@@ -288,7 +289,7 @@ class SpectraPlotter(ttk.Window):
         self.ax.axvline(x=xmin, linestyle='--', linewidth=1, color='red')
         self.ax.axvline(x=xmax, color=plt.gca().lines[-1].get_color(),\
                         linestyle='--', linewidth=1)
-        self.ax.annotate(f'{len(self.roi_limits) - 1}', xy=(xmin, 0),\
+        self.ax.annotate(f'{self.roi_limits.index(new_roi)}', xy=(xmin, 0),\
                          xytext=(xmax-(xmax-xmin)*0.5, 100),  fontsize=12)
         # Plotting the fit results on spectrum
         self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
