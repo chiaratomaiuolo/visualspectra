@@ -1,8 +1,9 @@
 # Python version requirements
-python_version >= 3.11
+python_version == 3.11 # because of ROOT library need
 # Python package requirements
 matplotlib
 numpy
+ROOT
 scipy
 tkinter
 ttkinterbootstrap
