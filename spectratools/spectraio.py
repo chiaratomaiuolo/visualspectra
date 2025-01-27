@@ -13,8 +13,8 @@ from typing import Tuple
 # ... then installed libraries...
 import matplotlib.pyplot as plt
 import numpy as np
-# ... and eventually local modules
 import uproot
+# ... and eventually local modules
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -26,9 +26,12 @@ def create_parser() -> argparse.ArgumentParser:
         The parser for the command line arguments.
     """
     parser = argparse.ArgumentParser(description='Spectrum Plotter Application')
-    parser.add_argument('--filepaths', type=str, nargs='+', help='Paths to the files to be plotted')
-    parser.add_argument('--nbins', type=int, default=4096, help='Number of bins of the spectrum')
-    parser.add_argument('--treename', type=str, default='Data_R', help='Name of the tree containing the data in a .root file')
+    parser.add_argument('--filepaths', type=str, nargs='+',\
+                        help='Paths to the files to be plotted')
+    parser.add_argument('--nbins', type=int, default=1024,\
+                        help='Number of bins of the spectrum')
+    parser.add_argument('--treename', type=str, default='Data_R',\
+                        help='Name of the tree containing the data in a .root file')
     return parser
 
 def import_from_txt(file_path: str | os.PathLike) -> Tuple[np.array, np.array]:
