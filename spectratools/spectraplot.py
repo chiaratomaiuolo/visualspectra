@@ -34,6 +34,7 @@ class SpectraPlotter(ttk.Window):
             # NB: (from Matplotlib documentation) If the data has already been 
             # binned and counted, use bar or stairs to plot the distribution. 
             self.current_spectrum = np.histogram(data, bins=self.nbins)
+        self.roi_limits = []
         # Line to follow the cursor
         self.cursor_line = None
         # Saving possible additional arguments
@@ -276,14 +277,19 @@ class SpectraPlotter(ttk.Window):
     # -------------- INTERVAL SELECTION BUTTON --------------
     def onselect(self, xmin, xmax):
         """Callback function to handle the selection of an interval."""
+        # Adding the Tuple containing the ROI limits to the dedicated class attribute
+        self.roi_limits.append((xmin, xmax))
         # Creating the ROI mask for further use
         roi_mask = (self.current_spectrum[1] >= xmin) & (self.current_spectrum[1] <= xmax)
         # Defining the roi_binning
         roi_binning = self.current_spectrum[1][roi_mask]
         popt, pcov = analysis_utils.onselect(self.current_spectrum, xmin, xmax)
         # Tracing the vertical lines defining the ROI
-        self.ax.axvline(x=xmin, color='red', linestyle='--')
-        self.ax.axvline(x=xmax, color='red', linestyle='--')
+        self.ax.axvline(x=xmin, linestyle='--', linewidth=1, color='red')
+        self.ax.axvline(x=xmax, color=plt.gca().lines[-1].get_color(),\
+                        linestyle='--', linewidth=1)
+        self.ax.annotate(f'{len(self.roi_limits) - 1}', xy=(xmin, 0),\
+                         xytext=(xmax-(xmax-xmin)*0.5, 100),  fontsize=12)
         # Plotting the fit results on spectrum
         self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
 
