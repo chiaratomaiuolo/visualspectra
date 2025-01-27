@@ -105,6 +105,11 @@ class SpectraPlotter(ttk.Window):
         # Set focus to the canvas to capture key events
         self.canvas.get_tk_widget().focus_set()
 
+        # Delete ROI(s) button
+        self.deleteroi_button = ttk.Button(self, text="Delete ROI(s)", bootstyle='primary',\
+                                        command=self.delete_roi)
+        self.deleteroi_button.place(x=700, y=10)
+
     def plot_spectra(self, file_path: str = None):
         """ Method plotting the spectra in the User Interface canva.
         """
@@ -214,6 +219,7 @@ class SpectraPlotter(ttk.Window):
 
         apply_button = ttk.Button(rebin_window, text="Apply", command=apply_rebin)
         apply_button.pack(pady=10)
+
     # -------------- SELECT SPECTRUM BUTTON --------------
     def select_spectrum(self):
         if not self.file_paths:
@@ -242,6 +248,7 @@ class SpectraPlotter(ttk.Window):
 
         apply_button = ttk.Button(select_window, text="Apply", command=apply_selection)
         apply_button.pack(pady=10)
+
     # -------------- DELETE FILE BUTTON --------------
     def delete_file(self):
         if not self.file_paths:
@@ -322,6 +329,52 @@ class SpectraPlotter(ttk.Window):
         if event.key == 'escape' and self.span.active:
             self.toggle_span_selector()
 
+    # -------------- DELETE ROI BUTTON --------------
+    def delete_roi(self):
+        if not self.roi_limits:
+            Messagebox.show_warning("Warning", "No ROI to delete.")
+            return
+        # Create a new window for ROI selection
+        delete_roi_window = ttk.Toplevel(self)
+        delete_roi_window.title("Delete ROI")
+        delete_roi_window.geometry("300x250")
+
+        ttk.Label(delete_roi_window, text="Select ROI:").pack(pady=10)
+        roi_delete = ttk.StringVar(delete_roi_window)
+        roi_menu_delete = ttk.Combobox(delete_roi_window, textvariable=roi_delete,\
+                                        values=[str(i) for i in range(len(self.roi_limits))] + ['All'])
+        roi_menu_delete.pack(pady=10)
+
+        def apply_roideletion():
+            selected_roi = roi_delete.get()
+            if selected_roi:
+                if selected_roi == 'All':
+                    self.roi_limits = [] # re-initializing the ROI list
+                    # Removing all ROI lines from the plot
+                    for line in self.ax.lines[:]:
+                            line.remove()
+                    # Removing all annotations
+                    annotations_to_remove = [annotation for annotation in self.ax.texts]
+                    for annotation in annotations_to_remove:
+                        annotation.remove()
+                    self.canvas.draw()
+                    delete_roi_window.destroy()
+                else:
+                    selected_roi = int(selected_roi)
+                    roi_limits = self.roi_limits[selected_roi]
+                    lines_to_remove = []
+                    for line in self.ax.lines:
+                        if (line.get_linestyle() == '--' and line.get_xdata()[0] in roi_limits) or (line.get_linestyle() == '-' and line.get_xdata()[0] in roi_limits):
+                            lines_to_remove.append(line)
+                    for line in lines_to_remove:
+                        line.remove()
+                    self.canvas.draw()
+                    delete_roi_window.destroy()
+            else:
+                Messagebox.show_warning("Warning", "Please select a ROI.")
+
+        apply_button = ttk.Button(delete_roi_window, text="Apply", command=apply_roideletion)
+        apply_button.pack(pady=10)
 
     # -------------- CLOSING PROTOCOL --------------
     def on_closing(self):
