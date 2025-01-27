@@ -15,7 +15,7 @@ import spectratools.spectraanalysis as analysis_utils
 import spectratools.spectraio as io_utils
 
 class SpectraPlotter(ttk.Window):
-    def __init__(self, file_paths: list[str | os.PathLike], **kwargs):
+    def __init__(self, file_paths: list[str | os.PathLike], nbins: int, **kwargs):
         """Class constructor
         """
         super().__init__(themename="flatly")
@@ -23,10 +23,17 @@ class SpectraPlotter(ttk.Window):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         # Loading file paths as class attributes
         self.file_paths = file_paths
+        self.nbins = nbins
         # Setting the 'current file' for fit purposes
         # to the last file in the list
         if len(self.file_paths) != 0:
             self.current_file = self.file_paths[-1]
+            # Importing the data of the current file
+            data = io_utils.import_spectrum(self.current_file)
+            # Constructing the current histogram and saving it as an attribute.
+            # NB: (from Matplotlib documentation) If the data has already been 
+            # binned and counted, use bar or stairs to plot the distribution. 
+            self.current_spectrum = np.histogram(data, bins=self.nbins)
         # Line to follow the cursor
         self.cursor_line = None
         # Saving possible additional arguments
@@ -63,12 +70,15 @@ class SpectraPlotter(ttk.Window):
         # Creating the Matplotlib figure inside the canva
         self.plot_spectra()
         # -------------- BUTTONS DEFINITION --------------
+        # Add spectrum button
         self.add_button = ttk.Button(self, text="Add Spectrum", command=self.add_spectra)
         self.add_button.place(x=10, y=10)
+
         # Rebin spectrum button
         self.rebin_button = ttk.Button(self, text="Rebin Spectrum", bootstyle='success',\
                                        command=self.rebin_spectra)
         self.rebin_button.place(x=120, y=10)
+
         # Select current spectrum button
         self.select_button = ttk.Button(self, text="Select current spectrum", bootstyle='default',\
                                         command=self.select_spectrum)
@@ -84,7 +94,7 @@ class SpectraPlotter(ttk.Window):
         self.span.set_active(False)  # Initially deactivate the SpanSelector
 
         # Add interval selection button
-        self.interval_button = ttk.Button(self, text="Select Interval", bootstyle='info',\
+        self.interval_button = ttk.Button(self, text="Select ROI", bootstyle='info',\
                                           command=self.toggle_span_selector)
         self.interval_button.place(x=520, y=10)
         # Connect the motion notify event
@@ -118,6 +128,9 @@ class SpectraPlotter(ttk.Window):
                             else 'black' for i in range(len(labels))]
             self.ax.legend(handles, labels, labelcolor=label_colors)
 
+            # Adding the axes labels
+            self.ax.set_xlabel("Energy [ADC counts]")
+            self.ax.set_ylabel("Counts")
             self.ax.grid(True)
             self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
@@ -154,6 +167,7 @@ class SpectraPlotter(ttk.Window):
                                                           ("TXT files", "*.txt")])
         if file_path:
             self.current_file = file_path
+            self.current_spectrum = np.histogram(io_utils.import_spectrum(file_path), bins=self.nbins)
             self.file_paths.append(file_path)
             self.plot_spectra()
         else:
@@ -219,6 +233,7 @@ class SpectraPlotter(ttk.Window):
             selected_file = file_select.get()
             if selected_file:
                 self.current_file = selected_file
+                self.current_spectrum = np.histogram(io_utils.import_spectrum(selected_file), bins=self.nbins)
                 self.plot_spectra()
                 select_window.destroy()
             else:
@@ -261,9 +276,17 @@ class SpectraPlotter(ttk.Window):
     # -------------- INTERVAL SELECTION BUTTON --------------
     def onselect(self, xmin, xmax):
         """Callback function to handle the selection of an interval."""
-        analysis_utils.onselect(xmin, xmax)
+        # Creating the ROI mask for further use
+        roi_mask = (self.current_spectrum[1] >= xmin) & (self.current_spectrum[1] <= xmax)
+        # Defining the roi_binning
+        roi_binning = self.current_spectrum[1][roi_mask]
+        popt, pcov = analysis_utils.onselect(self.current_spectrum, xmin, xmax)
+        # Tracing the vertical lines defining the ROI
         self.ax.axvline(x=xmin, color='red', linestyle='--')
         self.ax.axvline(x=xmax, color='red', linestyle='--')
+        # Plotting the fit results on spectrum
+        self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
+
         self.canvas.draw()
 
     def toggle_span_selector(self):
