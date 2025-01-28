@@ -169,3 +169,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Ignoring local fit results files...
+fitresults/*
+# ...but not fitresults repository
+!fitresults/
+!fitresults/.gitkeep
