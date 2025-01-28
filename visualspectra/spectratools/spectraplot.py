@@ -328,6 +328,7 @@ class SpectraPlotter(ttk.Window):
         # Saving fit results
         self.roi_popt.append(popt)
         self.roi_dpopt.append(dpopt)
+        self.roi_file.append(self.current_file)
         # Tracing the vertical lines defining the ROI
         self.ax.axvline(x=xmin, linestyle='--', linewidth=1, color='red')
         self.ax.axvline(x=xmax, color=plt.gca().lines[-1].get_color(),\
@@ -452,8 +453,8 @@ class SpectraPlotter(ttk.Window):
                 file.write('\n')
                 file.write(f'#Date of creation of this .txt file: {date_string_humanreadable}\n')
                 file.write('# Spectrum file ROI ID    xmin    xmax    mu  dmu sigma   dsigma\n')
-                for i, (file, roi, popt, dpopt) in enumerate(zip(self.roi_file, self.roi_limits, self.roi_popt, self.roi_dpopt)):
-                    file.write(f'{file}  {i}    {roi[0]}    {roi[1]}    {popt[3]}    {dpopt[3]}    {popt[4]}    {dpopt[4]}\n')
+                for i, (roifile, roi, popt, dpopt) in enumerate(zip(self.roi_file, self.roi_limits, self.roi_popt, self.roi_dpopt)):
+                    file.write(f'{roifile}     {i}    {roi[0]}    {roi[1]}    {popt[3]}    {dpopt[3]}    {popt[4]}    {dpopt[4]}\n')
                 Messagebox.ok(f"{((Path(__file__).parent).parent).parent}\fitresults\{date_string}.txt file created", "Save ROI(s) fit results", )
 
     # -------------- CLOSING PROTOCOL --------------
