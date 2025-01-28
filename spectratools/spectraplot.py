@@ -375,13 +375,18 @@ class SpectraPlotter(ttk.Window):
                     # Removing the corresponding annotations
                     annotations_to_remove = []
                     for annotation in self.ax.texts:
-                        if (annotation.get_position()[0] >= roi_limits[0]) and\
-                           (annotation.get_position()[0] <= roi_limits[1]):
+                        if annotation.get_position()[0] >= roi_limits[0] and annotation.get_position()[0] <= roi_limits[1]:
                             annotations_to_remove.append(annotation)
                     for annotation in annotations_to_remove:
                         annotation.remove()
-                    self.canvas.draw()
-                    delete_roi_window.destroy()
+                    # Removing all existing annotations
+                    for annotation in self.ax.texts[:]:
+                        annotation.remove()
+                    # Update the indices of the remaining ROIs and their annotations
+                    for i, roi in enumerate(self.roi_limits):
+                        self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(roi[1]-(roi[1]-roi[0])*0.5, 100), fontsize=12)
+                        self.canvas.draw()
+                        delete_roi_window.destroy()
             else:
                 Messagebox.show_warning("Warning", "Please select a ROI.")
 
