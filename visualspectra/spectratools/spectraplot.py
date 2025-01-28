@@ -37,7 +37,8 @@ class SpectraPlotter(ttk.Window):
             # binned and counted, use bar or stairs to plot the distribution. 
             self.current_spectrum = np.histogram(data, bins=self.nbins)
         self.roi_limits = []
-        self.roi_fit_results = []
+        self.roi_popt = []
+        self.roi_dpopt = []
         # Line to follow the cursor
         self.cursor_line = None
         # Saving possible additional arguments
@@ -252,6 +253,17 @@ class SpectraPlotter(ttk.Window):
                 self.current_file = selected_file
                 self.current_spectrum = np.histogram(io_utils.import_spectrum(selected_file), bins=self.nbins)
                 self.plot_spectra()
+                # If some ROIs are already defined, replot them
+                if self.roi_limits:
+                    for i, roi in enumerate(self.roi_limits):
+                        roi_mask = (self.current_spectrum[1] >= roi[0]) & (self.current_spectrum[1] <= roi[1])
+                        roi_binning = self.current_spectrum[1][roi_mask]
+                        popt = self.roi_popt[i]
+                        self.ax.axvline(x=roi[0], linestyle='--', linewidth=1, color='red')
+                        self.ax.axvline(x=roi[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
+                        self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(roi[1]-(roi[1]-roi[0])*0.5, 100), fontsize=12)
+                        self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
+                    self.canvas.draw()
                 select_window.destroy()
             else:
                 Messagebox.show_warning("Warning", "Please select a file.")
@@ -302,8 +314,9 @@ class SpectraPlotter(ttk.Window):
         # Defining the roi_binning
         roi_binning = self.current_spectrum[1][roi_mask]
         popt, dpopt = analysis_utils.onselect(self.current_spectrum, xmin, xmax)
-        fitresults = [popt[3], dpopt[3], popt[4], dpopt[4]]
-        self.roi_fit_results.append(fitresults)
+        # Saving fit results
+        self.roi_popt.append(popt)
+        self.roi_dpopt.append(dpopt)
         # Tracing the vertical lines defining the ROI
         self.ax.axvline(x=xmin, linestyle='--', linewidth=1, color='red')
         self.ax.axvline(x=xmax, color=plt.gca().lines[-1].get_color(),\
@@ -419,11 +432,14 @@ class SpectraPlotter(ttk.Window):
             date_string_humanreadable = now.strftime("%Y-%m-%d %H:%M:%S")
             with open(fr'{((Path(__file__).parent).parent).parent}\fitresults\{date_string}.txt', 'w') as file:
                 # Writing header
-                file.write(f'#Spectrum source file: {self.current_file}\n')
+                file.write('#Spectra source files: ')
+                for file_path in self.file_paths:
+                    file.write(f'{file_path}, ')
+                file.write('\n')
                 file.write(f'#Date of creation of this .txt file: {date_string_humanreadable}\n')
                 file.write('# ROI ID    xmin    xmax    mu  dmu sigma   dsigma\n')
-                for i, (roi, fitresults) in enumerate(zip(self.roi_limits, self.roi_fit_results)):
-                    file.write(f'{i}    {roi[0]}    {roi[1]}    {fitresults[0]}    {fitresults[1]}    {fitresults[2]}    {fitresults[3]}\n')
+                for i, (roi, popt, dpopt) in enumerate(zip(self.roi_limits, self.roi_popt, self.roi_dpopt)):
+                    file.write(f'{i}    {roi[0]}    {roi[1]}    {popt[3]}    {dpopt[3]}    {popt[4]}    {dpopt[4]}\n')
                 Messagebox.ok(f"{((Path(__file__).parent).parent).parent}\fitresults\{date_string}.txt file created", "Save ROI(s) fit results", )
 
     # -------------- CLOSING PROTOCOL --------------
