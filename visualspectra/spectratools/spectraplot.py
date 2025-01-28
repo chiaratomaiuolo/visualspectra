@@ -187,6 +187,16 @@ class SpectraPlotter(ttk.Window):
             self.current_spectrum = np.histogram(io_utils.import_spectrum(file_path), bins=self.nbins)
             self.file_paths.append(file_path)
             self.plot_spectra()
+            if self.roi_limits:
+                    for i, roi in enumerate(self.roi_limits):
+                        roi_mask = (self.current_spectrum[1] >= roi[0]) & (self.current_spectrum[1] <= roi[1])
+                        roi_binning = self.current_spectrum[1][roi_mask]
+                        popt = self.roi_popt[i]
+                        self.ax.axvline(x=roi[0], linestyle='--', linewidth=1, color='red')
+                        self.ax.axvline(x=roi[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
+                        self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(roi[1]-(roi[1]-roi[0])*0.5, 100), fontsize=12)
+                        self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
+                    self.canvas.draw()
         else:
             Messagebox.show_error("Error", f"File {file_path} not found.")
 
