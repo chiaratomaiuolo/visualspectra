@@ -1,6 +1,7 @@
 """Utilities for GUI creation and spectral plot
 """
 # System libraries first...
+from datetime import datetime
 import os
 from pathlib import Path
 from tkinter import filedialog
@@ -36,6 +37,7 @@ class SpectraPlotter(ttk.Window):
             # binned and counted, use bar or stairs to plot the distribution. 
             self.current_spectrum = np.histogram(data, bins=self.nbins)
         self.roi_limits = []
+        self.roi_fit_results = []
         # Line to follow the cursor
         self.cursor_line = None
         # Saving possible additional arguments
@@ -299,7 +301,9 @@ class SpectraPlotter(ttk.Window):
         roi_mask = (self.current_spectrum[1] >= xmin) & (self.current_spectrum[1] <= xmax)
         # Defining the roi_binning
         roi_binning = self.current_spectrum[1][roi_mask]
-        popt, pcov = analysis_utils.onselect(self.current_spectrum, xmin, xmax)
+        popt, dpopt = analysis_utils.onselect(self.current_spectrum, xmin, xmax)
+        fitresults = [popt[3], dpopt[3], popt[4], dpopt[4]]
+        self.roi_fit_results.append(fitresults)
         # Tracing the vertical lines defining the ROI
         self.ax.axvline(x=xmin, linestyle='--', linewidth=1, color='red')
         self.ax.axvline(x=xmax, color=plt.gca().lines[-1].get_color(),\
@@ -358,6 +362,7 @@ class SpectraPlotter(ttk.Window):
             if selected_roi:
                 if selected_roi == 'All':
                     self.roi_limits = [] # re-initializing the ROI list
+                    self.roi_fit_results = [] # re-initializing the ROI fit results list
                     # Removing all ROI lines from the plot
                     for line in self.ax.lines[:]:
                             line.remove()
@@ -370,8 +375,10 @@ class SpectraPlotter(ttk.Window):
                 else:
                     selected_roi = int(selected_roi)
                     roi_limits = self.roi_limits[selected_roi]
+                    roi_fitresults = self.roi_fit_results[selected_roi]
                     # Removing the ROI from the list of ROIs
                     self.roi_limits.remove(roi_limits)
+                    self.roi_fit_results.remove(roi_fitresults)
                     # Removing the ROI lines from the plot
                     lines_to_remove = []
                     for line in self.ax.lines:
@@ -406,20 +413,18 @@ class SpectraPlotter(ttk.Window):
         if not self.roi_limits:
             Messagebox.show_warning("Warning", "No ROI to save.")
             return
-        """
-    with open(fr'{data_directory}\overall_dataset.txt', 'w') as file:
-        # Writing header
-        print(fr'Opening {data_directory}\overall_dataset.txt...')
-        if led_on:
-            file.write("# Starting time [s]     Detector temperature [m*C]      K Peak position [ADC channels]    dKPeak [ADC channels]    LED Peak position [ADC channels]    dLEDPeak [ADC channels]\n")
-            for start, temp, kpeak, ledpeak in zip(starting_times, temps, k_peaks, led_peaks):
-                file.write(f"{start}    {temp}  {kpeak.n}  {kpeak.s}   {ledpeak.n}   {ledpeak.s}\n")
-        file.write("# Starting time [s]     Detector temperature [m*C]      Peak position [ADC channels]    dPeak [ADC channels]\n")
-        for start, temp, peak, dpeak in zip(starting_times, temps, k_peaks):
-            file.write(f"{start}    {temp}  {peak.n}  {peak.s}\n")
-        print(fr'... ended writing in {data_directory}\overall_dataset.txt .')
-    """
-        pass
+        else:
+            now = datetime.now()
+            date_string = now.strftime("%Y%m%d%H%M%S")
+            date_string_humanreadable = now.strftime("%Y-%m-%d %H:%M:%S")
+            with open(fr'{((Path(__file__).parent).parent).parent}\fitresults\{date_string}.txt', 'w') as file:
+                # Writing header
+                file.write(f'#Spectrum source file: {self.current_file}\n')
+                file.write(f'#Date of creation of this .txt file: {date_string_humanreadable}\n')
+                file.write('# ROI ID    xmin    xmax    mu  dmu sigma   dsigma\n')
+                for i, (roi, fitresults) in enumerate(zip(self.roi_limits, self.roi_fit_results)):
+                    file.write(f'{i}    {roi[0]}    {roi[1]}    {fitresults[0]}    {fitresults[1]}    {fitresults[2]}    {fitresults[3]}\n')
+                Messagebox.ok(f"{((Path(__file__).parent).parent).parent}\fitresults\{date_string}.txt file created", "Save ROI(s) fit results", )
 
     # -------------- CLOSING PROTOCOL --------------
     def on_closing(self):
