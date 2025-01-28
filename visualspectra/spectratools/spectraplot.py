@@ -39,6 +39,7 @@ class SpectraPlotter(ttk.Window):
         self.roi_limits = []
         self.roi_popt = []
         self.roi_dpopt = []
+        self.roi_file = [] # tracking the spectrum relative to a specific ROI
         # Line to follow the cursor
         self.cursor_line = None
         # Saving possible additional arguments
@@ -385,7 +386,9 @@ class SpectraPlotter(ttk.Window):
             if selected_roi:
                 if selected_roi == 'All':
                     self.roi_limits = [] # re-initializing the ROI list
-                    self.roi_fit_results = [] # re-initializing the ROI fit results list
+                    self.roi_popt = [] # re-initializing the ROI fit results list
+                    self.roi_dpopt = [] # re-initializing the ROI fit errors list
+                    self.roi_file = [] # re-initializing the ROI file list
                     # Removing all ROI lines from the plot
                     for line in self.ax.lines[:]:
                             line.remove()
@@ -398,10 +401,11 @@ class SpectraPlotter(ttk.Window):
                 else:
                     selected_roi = int(selected_roi)
                     roi_limits = self.roi_limits[selected_roi]
-                    roi_fitresults = self.roi_fit_results[selected_roi]
                     # Removing the ROI from the list of ROIs
                     self.roi_limits.remove(roi_limits)
-                    self.roi_fit_results.remove(roi_fitresults)
+                    self.roi_popt.remove(self.roi_popt[selected_roi])
+                    self.roi_dpopt.remove(self.roi_dpopt[selected_roi])
+                    self.roi_file.remove(self.roi_file[selected_roi])
                     # Removing the ROI lines from the plot
                     lines_to_remove = []
                     for line in self.ax.lines:
@@ -447,9 +451,9 @@ class SpectraPlotter(ttk.Window):
                     file.write(f'{file_path}, ')
                 file.write('\n')
                 file.write(f'#Date of creation of this .txt file: {date_string_humanreadable}\n')
-                file.write('# ROI ID    xmin    xmax    mu  dmu sigma   dsigma\n')
-                for i, (roi, popt, dpopt) in enumerate(zip(self.roi_limits, self.roi_popt, self.roi_dpopt)):
-                    file.write(f'{i}    {roi[0]}    {roi[1]}    {popt[3]}    {dpopt[3]}    {popt[4]}    {dpopt[4]}\n')
+                file.write('# Spectrum file ROI ID    xmin    xmax    mu  dmu sigma   dsigma\n')
+                for i, (file, roi, popt, dpopt) in enumerate(zip(self.roi_file, self.roi_limits, self.roi_popt, self.roi_dpopt)):
+                    file.write(f'{file}  {i}    {roi[0]}    {roi[1]}    {popt[3]}    {dpopt[3]}    {popt[4]}    {dpopt[4]}\n')
                 Messagebox.ok(f"{((Path(__file__).parent).parent).parent}\fitresults\{date_string}.txt file created", "Save ROI(s) fit results", )
 
     # -------------- CLOSING PROTOCOL --------------
