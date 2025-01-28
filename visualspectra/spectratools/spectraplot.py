@@ -2,6 +2,7 @@
 """
 # System libraries first...
 import os
+from pathlib import Path
 from tkinter import filedialog
 import ttkbootstrap as ttk
 from ttkbootstrap.dialogs import Messagebox
@@ -109,6 +110,13 @@ class SpectraPlotter(ttk.Window):
         self.deleteroi_button = ttk.Button(self, text="Delete ROI(s)", bootstyle='primary',\
                                         command=self.delete_roi)
         self.deleteroi_button.place(x=700, y=10)
+
+        # Save ROI fit results button
+        self.save_button = ttk.Button(self, text="Save ROI fit results", bootstyle='primary',\
+                                      command=self.save_results)
+        self.save_button.place(x=820, y=10)
+
+
 
     def plot_spectra(self, file_path: str = None):
         """ Method plotting the spectra in the User Interface canva.
@@ -392,6 +400,26 @@ class SpectraPlotter(ttk.Window):
 
         apply_button = ttk.Button(delete_roi_window, text="Apply", command=apply_roideletion)
         apply_button.pack(pady=10)
+
+    # -------------- SAVE RESULTS BUTTON --------------
+    def save_results(self):
+        if not self.roi_limits:
+            Messagebox.show_warning("Warning", "No ROI to save.")
+            return
+        """
+    with open(fr'{data_directory}\overall_dataset.txt', 'w') as file:
+        # Writing header
+        print(fr'Opening {data_directory}\overall_dataset.txt...')
+        if led_on:
+            file.write("# Starting time [s]     Detector temperature [m*C]      K Peak position [ADC channels]    dKPeak [ADC channels]    LED Peak position [ADC channels]    dLEDPeak [ADC channels]\n")
+            for start, temp, kpeak, ledpeak in zip(starting_times, temps, k_peaks, led_peaks):
+                file.write(f"{start}    {temp}  {kpeak.n}  {kpeak.s}   {ledpeak.n}   {ledpeak.s}\n")
+        file.write("# Starting time [s]     Detector temperature [m*C]      Peak position [ADC channels]    dPeak [ADC channels]\n")
+        for start, temp, peak, dpeak in zip(starting_times, temps, k_peaks):
+            file.write(f"{start}    {temp}  {peak.n}  {peak.s}\n")
+        print(fr'... ended writing in {data_directory}\overall_dataset.txt .')
+    """
+        pass
 
     # -------------- CLOSING PROTOCOL --------------
     def on_closing(self):
