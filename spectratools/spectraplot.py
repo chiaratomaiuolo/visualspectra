@@ -362,12 +362,24 @@ class SpectraPlotter(ttk.Window):
                 else:
                     selected_roi = int(selected_roi)
                     roi_limits = self.roi_limits[selected_roi]
+                    # Removing the ROI from the list of ROIs
+                    self.roi_limits.remove(roi_limits)
+                    # Removing the ROI lines from the plot
                     lines_to_remove = []
                     for line in self.ax.lines:
-                        if (line.get_linestyle() == '--' and line.get_xdata()[0] in roi_limits) or (line.get_linestyle() == '-' and line.get_xdata()[0] in roi_limits):
+                        if (line.get_linestyle() == '--' and line.get_xdata()[0] in roi_limits)\
+                            or (line.get_xdata()[0] >= roi_limits[0] and line.get_xdata()[0] <= roi_limits[1]):
                             lines_to_remove.append(line)
                     for line in lines_to_remove:
                         line.remove()
+                    # Removing the corresponding annotations
+                    annotations_to_remove = []
+                    for annotation in self.ax.texts:
+                        if (annotation.get_position()[0] >= roi_limits[0]) and\
+                           (annotation.get_position()[0] <= roi_limits[1]):
+                            annotations_to_remove.append(annotation)
+                    for annotation in annotations_to_remove:
+                        annotation.remove()
                     self.canvas.draw()
                     delete_roi_window.destroy()
             else:
