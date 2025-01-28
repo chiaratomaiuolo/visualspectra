@@ -1,0 +1,3 @@
+# Source file: {filename}
+# Date of creation of this .txt file: {date}
+# ROI ID    xmin    xmax    mu  dmu sigma   dsigma
