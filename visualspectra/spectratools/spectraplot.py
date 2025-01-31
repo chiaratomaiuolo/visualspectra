@@ -434,20 +434,49 @@ class SpectraPlotter(ttk.Window):
             Messagebox.show_warning("Warning", "No ROI to save.")
             return
         else:
+            # Chiedi all'utente di inserire il nome del file
+            file_name = self.ask_file_name()
+            if not file_name:
+                Messagebox.show_warning("Warning", "File name cannot be empty.")
+                return
+
+            # Ottieni la data e l'ora corrente
             now = datetime.now()
-            date_string = now.strftime("%Y%m%d%H%M%S")
-            date_string_humanreadable = now.strftime("%Y-%m-%d %H:%M:%S")
-            with open(fr'{((Path(__file__).parent).parent).parent}\fitresults\{date_string}.txt', 'w') as file:
+            # Formatta la data e l'ora come stringa
+            date_string = now.strftime("%Y-%m-%d %H:%M:%S")
+            # Aggiungi un timestamp al nome del file per evitare sovrascritture
+            file_name = f"{file_name}.txt"
+            # Ottieni il percorso del file
+            file_path = ((Path(__file__).parent).parent).parent / 'fitresults' / file_name
+            # Crea la directory se non esiste
+            #file_path.parent.mkdir(parents=True, exist_ok=True)
+            # Scrivi i risultati nel file
+            with open(file_path, 'w') as file:
                 # Writing header
-                file.write('#Spectra source files: ')
-                for file_path in self.file_paths:
-                    file.write(f'{file_path}, ')
-                file.write('\n')
-                file.write(f'#Date of creation of this .txt file: {date_string_humanreadable}\n')
-                file.write('# Spectrum file ROI ID    xmin    xmax    mu  dmu sigma   dsigma\n')
-                for i, (roifile, roi, popt, dpopt) in enumerate(zip(self.roi_file, self.roi_limits, self.roi_popt, self.roi_dpopt)):
-                    file.write(f'{roifile}     {i}    {roi[0]}    {roi[1]}    {popt[3]}    {dpopt[3]}    {popt[4]}    {dpopt[4]}\n')
-                Messagebox.ok(f"{((Path(__file__).parent).parent).parent}\fitresults\{date_string}.txt file created", "Save ROI(s) fit results", )
+                file.write(f'# Source file: {self.current_file}\n')
+                file.write(f'# Date of creation of this .txt file: {date_string}\n')
+                file.write('# ROI ID    xmin    xmax    mu  dmu sigma   dsigma\n')
+                for i, (roi, fitresults, dfitresults) in enumerate(zip(self.roi_limits, self.roi_popt, self.roi_dpopt)):
+                    file.write(f'{i}    {roi[0]}    {roi[1]}    {fitresults[3]}    {dfitresults[3]}    {fitresults[4]}    {dfitresults[4]}\n')
+            Messagebox.ok(f"{file_path} file created", "Save ROI(s) fit results")
+
+    def ask_file_name(self):
+        """Ask the user for a file name using a custom dialog."""
+        dialog = ttk.Toplevel(self)
+        dialog.title("Enter File Name")
+        dialog.geometry("300x150")
+
+        ttk.Label(dialog, text="Enter the name of the file:").pack(pady=10)
+        file_name_var = ttk.StringVar()
+        file_name_entry = ttk.Entry(dialog, textvariable=file_name_var)
+        file_name_entry.pack(pady=10)
+
+        def on_ok():
+            dialog.destroy()
+
+        ttk.Button(dialog, text="OK", command=on_ok).pack(pady=10)
+        dialog.wait_window(dialog)
+        return file_name_var.get()
 
     # -------------- CLOSING PROTOCOL --------------
     def on_closing(self):
