@@ -335,8 +335,10 @@ class SpectraPlotter(ttk.Window):
                         linestyle='--', linewidth=1)
         self.ax.annotate(f'{self.roi_limits.index(new_roi)}', xy=(xmin, 0),\
                          xytext=(xmax-(xmax-xmin)*0.5, 100),  fontsize=12)
+
         # Plotting the fit results on spectrum
-        self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
+        w = np.linspace(min(roi_binning), max(roi_binning), 1000)
+        self.ax.plot(w, analysis_utils.GaussLine(w, popt))
 
         self.canvas.draw()
 
@@ -392,10 +394,9 @@ class SpectraPlotter(ttk.Window):
                     self.roi_file = [] # re-initializing the ROI file list
                     # Removing all ROI lines from the plot
                     for line in self.ax.lines[:]:
-                            line.remove()
+                        line.remove()
                     # Removing all annotations
-                    annotations_to_remove = [annotation for annotation in self.ax.texts]
-                    for annotation in annotations_to_remove:
+                    for annotation in self.ax.texts:
                         annotation.remove()
                     self.canvas.draw()
                     delete_roi_window.destroy()
@@ -403,33 +404,24 @@ class SpectraPlotter(ttk.Window):
                     selected_roi = int(selected_roi)
                     roi_limits = self.roi_limits[selected_roi]
                     # Removing the ROI from the list of ROIs
+                    self.roi_popt.pop(selected_roi)
                     self.roi_limits.remove(roi_limits)
-                    self.roi_popt.remove(self.roi_popt[selected_roi])
-                    self.roi_dpopt.remove(self.roi_dpopt[selected_roi])
-                    self.roi_file.remove(self.roi_file[selected_roi])
+                    self.roi_dpopt.pop(selected_roi)
+                    self.roi_file.pop(selected_roi)
                     # Removing the ROI lines from the plot
-                    lines_to_remove = []
                     for line in self.ax.lines:
                         if (line.get_linestyle() == '--' and line.get_xdata()[0] in roi_limits)\
                             or (line.get_xdata()[0] >= roi_limits[0] and line.get_xdata()[0] <= roi_limits[1]):
-                            lines_to_remove.append(line)
-                    for line in lines_to_remove:
-                        line.remove()
+                            line.remove()
                     # Removing the corresponding annotations
-                    annotations_to_remove = []
                     for annotation in self.ax.texts:
-                        if annotation.get_position()[0] >= roi_limits[0] and annotation.get_position()[0] <= roi_limits[1]:
-                            annotations_to_remove.append(annotation)
-                    for annotation in annotations_to_remove:
-                        annotation.remove()
-                    # Removing all existing annotations
-                    for annotation in self.ax.texts[:]:
                         annotation.remove()
                     # Update the indices of the remaining ROIs and their annotations
                     for i, roi in enumerate(self.roi_limits):
                         self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(roi[1]-(roi[1]-roi[0])*0.5, 100), fontsize=12)
-                        self.canvas.draw()
-                        delete_roi_window.destroy()
+
+                    self.canvas.draw()
+                    delete_roi_window.destroy()
             else:
                 Messagebox.show_warning("Warning", "Please select a ROI.")
 
