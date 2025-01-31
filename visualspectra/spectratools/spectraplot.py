@@ -455,9 +455,9 @@ class SpectraPlotter(ttk.Window):
                 # Writing header
                 file.write(f'# Source file: {self.current_file}\n')
                 file.write(f'# Date of creation of this .txt file: {date_string}\n')
-                file.write('# ROI ID    xmin    xmax    mu  dmu sigma   dsigma\n')
+                file.write('# ROI ID    xmin    xmax    mu  dmu sigma   dsigma     res\n')
                 for i, (roi, fitresults, dfitresults) in enumerate(zip(self.roi_limits, self.roi_popt, self.roi_dpopt)):
-                    file.write(f'{i}    {roi[0]}    {roi[1]}    {fitresults[3]}    {dfitresults[3]}    {fitresults[4]}    {dfitresults[4]}\n')
+                    file.write(f'{i}    {roi[0]}    {roi[1]}    {fitresults[3]}    {dfitresults[3]}    {fitresults[4]}    {dfitresults[4]}     {fitresults[4]/fitresults[3]}\n')
             Messagebox.ok(f"{file_path} file created", "Save ROI(s) fit results")
 
     def ask_file_name(self):
