@@ -159,7 +159,7 @@ class SpectraPlotter(ttk.Window):
                         patch.remove()
                     del self.histograms[file_path]
                 spectrum = io_utils.import_spectrum(file_path, treename=self.treename)
-                hist = self.ax.hist(spectrum, bins=self.nbins,\
+                hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6,\
                                     label=f'{os.path.basename(file_path)}')
                 self.histograms[file_path] = hist[2]  # Save the patches of the histogram
             except FileNotFoundError:
