@@ -26,6 +26,7 @@ class SpectraPlotter(ttk.Window):
         # Loading file paths as class attributes
         self.file_paths = file_paths
         self.nbins = nbins
+        self.density = False
         # Setting the 'current file' for fit purposes
         # to the last file in the list
         if len(self.file_paths) != 0:
@@ -77,7 +78,8 @@ class SpectraPlotter(ttk.Window):
         self.plot_spectra()
         # -------------- BUTTONS DEFINITION --------------
         # Add spectrum button
-        self.add_button = ttk.Button(self, text="Add Spectrum", command=self.add_spectra)
+        self.add_button = ttk.Button(self, text="Add Spectrum",  bootstyle='success',\
+                                     command=self.add_spectra)
         self.add_button.place(x=10, y=10)
 
         # Rebin spectrum button
@@ -85,12 +87,17 @@ class SpectraPlotter(ttk.Window):
                                        command=self.rebin_spectra)
         self.rebin_button.place(x=120, y=10)
 
+        # Normalize spectra button
+        self.normalize_button = ttk.Button(self, text="Normalize/Un-normalize Spectrum", bootstyle='success',\
+                                             command=self.normalize_spectra)
+        self.normalize_button.place(x=520, y=10)
+
         # Select current spectrum button
-        self.select_button = ttk.Button(self, text="Select current spectrum", bootstyle='default',\
+        self.select_button = ttk.Button(self, text="Select current spectrum", bootstyle='success',\
                                         command=self.select_spectrum)
         self.select_button.place(x=240, y=10)
         # Delete opened file button
-        self.delete_button = ttk.Button(self, text="Close spectrum", bootstyle='danger',\
+        self.delete_button = ttk.Button(self, text="Close spectrum", bootstyle='success',\
                                         command=self.delete_file)
         self.delete_button.place(x=400, y=10)
         # Interval selection button
@@ -100,9 +107,9 @@ class SpectraPlotter(ttk.Window):
         self.span.set_active(False)  # Initially deactivate the SpanSelector
 
         # Add interval selection button
-        self.interval_button = ttk.Button(self, text="Select ROI", bootstyle='info',\
+        self.interval_button = ttk.Button(self, text="Select ROI", bootstyle='primary',\
                                           command=self.toggle_span_selector)
-        self.interval_button.place(x=520, y=10)
+        self.interval_button.place(x=740, y=10)
         # Connect the motion notify event
         self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         # Connect the key press event
@@ -113,12 +120,12 @@ class SpectraPlotter(ttk.Window):
         # Delete ROI(s) button
         self.deleteroi_button = ttk.Button(self, text="Delete ROI(s)", bootstyle='primary',\
                                         command=self.delete_roi)
-        self.deleteroi_button.place(x=700, y=10)
+        self.deleteroi_button.place(x=820, y=10)
 
         # Save ROI fit results button
         self.save_button = ttk.Button(self, text="Save ROI fit results", bootstyle='primary',\
                                       command=self.save_results)
-        self.save_button.place(x=820, y=10)
+        self.save_button.place(x=920, y=10)
 
 
 
@@ -134,9 +141,14 @@ class SpectraPlotter(ttk.Window):
             for file in self.file_paths:
                 try:
                     spectrum = io_utils.import_spectrum(file, treename=self.treename)
-                    hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6,\
-                                        label=f'{os.path.basename(file)}')
-                    self.histograms[file] = hist[2]  # Save the patches (rectangles) of the histogram
+                    if self.density is False:
+                        hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6,\
+                                            label=f'{os.path.basename(file)}')
+                        self.histograms[file] = hist[2]  # Save the patches (rectangles) of the histogram
+                    else:
+                        hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6,\
+                                            label=f'{os.path.basename(file)}', density=True)
+                        self.histograms[file] = hist[2]  # Save the patches (rectangles) of the histogram
                 except FileNotFoundError:
                     Messagebox.show_warning("Warning", f"File {file} not found.")
 
@@ -159,9 +171,14 @@ class SpectraPlotter(ttk.Window):
                         patch.remove()
                     del self.histograms[file_path]
                 spectrum = io_utils.import_spectrum(file_path, treename=self.treename)
-                hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6,\
-                                    label=f'{os.path.basename(file_path)}')
-                self.histograms[file_path] = hist[2]  # Save the patches of the histogram
+                if self.density is False:
+                    hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6,\
+                                        label=f'{os.path.basename(file_path)}')
+                    self.histograms[file_path] = hist[2]  # Save the patches of the histogram
+                else:
+                    hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6,\
+                                        label=f'{os.path.basename(file_path)}', density=True)
+                    self.histograms[file_path] = hist[2]
             except FileNotFoundError:
                 Messagebox.show_warning("Warning", f"File {file_path} not found.")
 
@@ -241,6 +258,21 @@ class SpectraPlotter(ttk.Window):
 
         apply_button = ttk.Button(rebin_window, text="Apply", command=apply_rebin)
         apply_button.pack(pady=10)
+
+
+    # -------------- NORMALIZE SPECTRA BUTTON --------------
+    def normalize_spectra(self):
+        if not self.file_paths:
+            Messagebox.show_warning("Warning", "No histogram to normalize.")
+            return
+        if self.density is False:
+            self.density = True
+            self.plot_spectra()
+            return
+        else:
+            self.density = False
+            self.plot_spectra()
+            return
 
     # -------------- SELECT SPECTRUM BUTTON --------------
     def select_spectrum(self):
