@@ -211,7 +211,6 @@ class SpectraPlotter(ttk.Window):
                 y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max()/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))*0.8
                 self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
         self.canvas.draw()
-        self.canvas.draw()
 
     # -------------- BUTTON DEFINITION FUNCTIONS --------------
 
