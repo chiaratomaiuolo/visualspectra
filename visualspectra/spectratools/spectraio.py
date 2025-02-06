@@ -30,7 +30,7 @@ def create_parser() -> argparse.ArgumentParser:
                         help='Paths to the files to be plotted')
     parser.add_argument('--nbins', type=int, default=1024,\
                         help='Number of bins of the spectrum')
-    parser.add_argument('--treename', type=str, default='Data_R',\
+    parser.add_argument('--treename', type=str, default='DataR',\
                         help='Name of the tree containing the data in a .root file')
     return parser
 
