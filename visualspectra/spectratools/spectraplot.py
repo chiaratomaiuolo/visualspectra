@@ -142,11 +142,11 @@ class SpectraPlotter(ttk.Window):
                 try:
                     spectrum = io_utils.import_spectrum(file, treename=self.treename)
                     if self.density is False:
-                        hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6,\
+                        hist = self.ax.hist(spectrum, bins=np.linspace(1,max(spectrum),self.nbins), alpha=0.6,\
                                             label=f'{os.path.basename(file)}')
                         self.histograms[file] = hist[2]  # Save the patches (rectangles) of the histogram
                     else:
-                        hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6,\
+                        hist = self.ax.hist(spectrum, bins=np.linspace(1,max(spectrum),self.nbins), alpha=0.6,\
                                             label=f'{os.path.basename(file)}', density=True)
                         self.histograms[file] = hist[2]  # Save the patches (rectangles) of the histogram
                 except FileNotFoundError:
@@ -162,7 +162,7 @@ class SpectraPlotter(ttk.Window):
             self.ax.set_xlabel("Energy [ADC counts]")
             self.ax.set_ylabel("Counts")
             self.ax.grid(True)
-            self.ax.autoscale()  # Autoscale the axes
+            #self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
         else: # If a file path is provided, plot only that file on the current axes
             try:
@@ -172,11 +172,11 @@ class SpectraPlotter(ttk.Window):
                     del self.histograms[file_path]
                 spectrum = io_utils.import_spectrum(file_path, treename=self.treename)
                 if self.density is False:
-                    hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6,\
+                    hist = self.ax.hist(spectrum[10:], bins=self.nbins, alpha=0.6,\
                                         label=f'{os.path.basename(file_path)}')
                     self.histograms[file_path] = hist[2]  # Save the patches of the histogram
                 else:
-                    hist = self.ax.hist(spectrum, bins=self.nbins, alpha=0.6,\
+                    hist = self.ax.hist(spectrum[10:], bins=self.nbins, alpha=0.6,\
                                         label=f'{os.path.basename(file_path)}', density=True)
                     self.histograms[file_path] = hist[2]
             except FileNotFoundError:
@@ -189,7 +189,8 @@ class SpectraPlotter(ttk.Window):
             self.ax.legend(handles, labels, labelcolor=label_colors)
 
             self.ax.grid(True)
-            self.ax.autoscale()  # Autoscale the axes
+            self.ax.set_xlim(10, None)
+            #self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
 
     # -------------- BUTTON DEFINITION FUNCTIONS --------------
@@ -201,8 +202,15 @@ class SpectraPlotter(ttk.Window):
                                                           ("CSV files", "*.csv"),\
                                                           ("TXT files", "*.txt")])
         if file_path:
+            file_name = os.path.basename(file_path)
             self.current_file = file_path
-            self.current_spectrum = np.histogram(io_utils.import_spectrum(file_path), bins=self.nbins)
+            if file_name.startswith('DataR'):
+                self.treename = 'Data_R'
+            elif file_name.startswith('DataF'):
+                self.treename = 'Data_F'
+            elif file_name.startswith('Data'):
+                self.treename = 'Data'
+            self.current_spectrum = np.histogram(io_utils.import_spectrum(file_path, treename=self.treename), bins=self.nbins)
             self.file_paths.append(file_path)
             self.plot_spectra()
             if self.roi_limits:
@@ -268,10 +276,36 @@ class SpectraPlotter(ttk.Window):
         if self.density is False:
             self.density = True
             self.plot_spectra()
+            # If some ROIs are already defined, replot them
+            if self.roi_limits:
+                for i, roi in enumerate(self.roi_limits):
+                    roi_mask = (self.current_spectrum[1] >= roi[0]) & (self.current_spectrum[1] <= roi[1])
+                    roi_binning = self.current_spectrum[1][roi_mask]
+                    popt = self.roi_popt[i]
+                    self.ax.axvline(x=roi[0], linestyle='--', linewidth=1, color='red')
+                    self.ax.axvline(x=roi[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
+                    self.ax.plot(roi_binning, (analysis_utils.GaussLine(roi_binning, popt))/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))
+                    x_annotate = roi[0] + (roi[1]-roi[0])*0.5
+                    y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max()/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))*0.8
+                    self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
+                self.canvas.draw()
             return
         else:
             self.density = False
             self.plot_spectra()
+            # If some ROIs are already defined, replot them
+            if self.roi_limits:
+                for i, roi in enumerate(self.roi_limits):
+                    roi_mask = (self.current_spectrum[1] >= roi[0]) & (self.current_spectrum[1] <= roi[1])
+                    roi_binning = self.current_spectrum[1][roi_mask]
+                    popt = self.roi_popt[i]
+                    self.ax.axvline(x=roi[0], linestyle='--', linewidth=1, color='red')
+                    self.ax.axvline(x=roi[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
+                    self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
+                    x_annotate = roi[0] + (roi[1]-roi[0])*0.5
+                    y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max())*0.8
+                    self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
+                self.canvas.draw()
             return
 
     # -------------- SELECT SPECTRUM BUTTON --------------
@@ -305,7 +339,10 @@ class SpectraPlotter(ttk.Window):
                         self.ax.axvline(x=roi[0], linestyle='--', linewidth=1, color='red')
                         self.ax.axvline(x=roi[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
                         self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(roi[1]-(roi[1]-roi[0])*0.5, 100), fontsize=12)
-                        self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
+                        if self.density is False:
+                            self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
+                        else:
+                            self.ax.plot(roi_binning, (analysis_utils.GaussLine(roi_binning, popt))/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))
                     self.canvas.draw()
                 select_window.destroy()
             else:
@@ -354,9 +391,11 @@ class SpectraPlotter(ttk.Window):
         self.roi_limits.append(new_roi)
         # Creating the ROI mask for further use
         roi_mask = (self.current_spectrum[1] >= xmin) & (self.current_spectrum[1] <= xmax)
+        roi_mask_tmp = roi_mask[:-1]
         # Defining the roi_binning
         roi_binning = self.current_spectrum[1][roi_mask]
-        popt, dpopt = analysis_utils.onselect(self.current_spectrum, xmin, xmax)
+        popt, dpopt = analysis_utils.onselect(self.current_spectrum, xmin, xmax,\
+                                              density=self.density)
         # Saving fit results
         self.roi_popt.append(popt)
         self.roi_dpopt.append(dpopt)
@@ -365,12 +404,17 @@ class SpectraPlotter(ttk.Window):
         self.ax.axvline(x=xmin, linestyle='--', linewidth=1, color='red')
         self.ax.axvline(x=xmax, color=plt.gca().lines[-1].get_color(),\
                         linestyle='--', linewidth=1)
+        x_annotate = xmin + (xmax-xmin)*0.5
+        y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max())*0.8
         self.ax.annotate(f'{self.roi_limits.index(new_roi)}', xy=(xmin, 0),\
-                         xytext=(xmax-(xmax-xmin)*0.5, 100),  fontsize=12)
+                         xytext=(x_annotate, y_annotate),  fontsize=12)
 
         # Plotting the fit results on spectrum
         w = np.linspace(min(roi_binning), max(roi_binning), 1000)
-        self.ax.plot(w, analysis_utils.GaussLine(w, popt))
+        if self.density is False:
+            self.ax.plot(w, analysis_utils.GaussLine(w, popt))
+        else:
+            self.ax.plot(w, (analysis_utils.GaussLine(w, popt))/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))
 
         self.canvas.draw()
 

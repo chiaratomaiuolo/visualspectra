@@ -50,7 +50,7 @@ def init_computation(content: np.array, bins: np.array) -> List[float]:
     
     return m, q, N, mu, sigma
 
-def roi_fit(spectrum: np.array, roi_min: float, roi_max: float) -> Tuple[np.array, np.array]:
+def roi_fit(spectrum: np.array, roi_min: float, roi_max: float, density: bool=False) -> Tuple[np.array, np.array]:
     """ Function for the fitting of a spectrum inside a ROI.
         The fit function is Gaussian + Linear BKG.
     """
@@ -63,6 +63,7 @@ def roi_fit(spectrum: np.array, roi_min: float, roi_max: float) -> Tuple[np.arra
     roi_bins = np.array(roi_bins, dtype='float64')
     roi_content = content[(bins >= roi_min) & (bins <= roi_max)]
     roi_content = np.array(roi_content, dtype='float64')
+
     # Creating a ROOT RDataFrame from the numpy arrays
     # Creation of the TGraph
     graph = root.TGraph(len(roi_bins), roi_bins, roi_content)
@@ -89,12 +90,12 @@ def roi_fit(spectrum: np.array, roi_min: float, roi_max: float) -> Tuple[np.arra
     return np.array(popt), np.array(dpopt)
 
 
-def onselect(spectrum, xmin, xmax):
+def onselect(spectrum, xmin, xmax, density: bool=False):
     """Callback function to handle the selection of an interval.
        Once the ROI has been selected, a fit with a GaussLine model is performed inside.
     """
     # Performing the fit inside the ROI
-    popt, dpopt = roi_fit(spectrum, xmin, xmax)
+    popt, dpopt = roi_fit(spectrum, xmin, xmax, density=density)
     # Printing the parameters on terminal...
     par_names = ['m', 'q', 'N', 'mu', 'sigma']
     for name, par, dpar in zip(par_names, popt, dpopt):
