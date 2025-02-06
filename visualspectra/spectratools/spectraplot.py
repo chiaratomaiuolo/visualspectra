@@ -193,6 +193,26 @@ class SpectraPlotter(ttk.Window):
             #self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
 
+    def roi_draw(self, density):
+        for i, roi in enumerate(self.roi_limits):
+            roi_mask = (self.current_spectrum[1] >= roi[0]) & (self.current_spectrum[1] <= roi[1])
+            roi_binning = self.current_spectrum[1][roi_mask]
+            popt = self.roi_popt[i]
+            self.ax.axvline(x=roi[0], linestyle='--', linewidth=1, color='red')
+            self.ax.axvline(x=roi[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
+            if density is False:
+                self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
+                x_annotate = roi[0] + (roi[1]-roi[0])*0.5
+                y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max())*0.8
+                self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
+            else:
+                self.ax.plot(roi_binning, (analysis_utils.GaussLine(roi_binning, popt))/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))
+                x_annotate = roi[0] + (roi[1]-roi[0])*0.5
+                y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max()/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))*0.8
+                self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
+        self.canvas.draw()
+        self.canvas.draw()
+
     # -------------- BUTTON DEFINITION FUNCTIONS --------------
 
     # -------------- ADD SPECTRA BUTTON --------------
@@ -214,15 +234,8 @@ class SpectraPlotter(ttk.Window):
             self.file_paths.append(file_path)
             self.plot_spectra()
             if self.roi_limits:
-                    for i, roi in enumerate(self.roi_limits):
-                        roi_mask = (self.current_spectrum[1] >= roi[0]) & (self.current_spectrum[1] <= roi[1])
-                        roi_binning = self.current_spectrum[1][roi_mask]
-                        popt = self.roi_popt[i]
-                        self.ax.axvline(x=roi[0], linestyle='--', linewidth=1, color='red')
-                        self.ax.axvline(x=roi[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
-                        self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(roi[1]-(roi[1]-roi[0])*0.5, 100), fontsize=12)
-                        self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
-                    self.canvas.draw()
+                    # If ROis are present, let's replot them
+                    self.roi_draw(self.density)
         else:
             Messagebox.show_error("Error", f"File {file_path} not found.")
 
@@ -278,16 +291,7 @@ class SpectraPlotter(ttk.Window):
             self.plot_spectra()
             # If some ROIs are already defined, replot them
             if self.roi_limits:
-                for i, roi in enumerate(self.roi_limits):
-                    roi_mask = (self.current_spectrum[1] >= roi[0]) & (self.current_spectrum[1] <= roi[1])
-                    roi_binning = self.current_spectrum[1][roi_mask]
-                    popt = self.roi_popt[i]
-                    self.ax.axvline(x=roi[0], linestyle='--', linewidth=1, color='red')
-                    self.ax.axvline(x=roi[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
-                    self.ax.plot(roi_binning, (analysis_utils.GaussLine(roi_binning, popt))/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))
-                    x_annotate = roi[0] + (roi[1]-roi[0])*0.5
-                    y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max()/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))*0.8
-                    self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
+                self.roi_draw(self.density)
                 self.canvas.draw()
             return
         else:
@@ -295,17 +299,7 @@ class SpectraPlotter(ttk.Window):
             self.plot_spectra()
             # If some ROIs are already defined, replot them
             if self.roi_limits:
-                for i, roi in enumerate(self.roi_limits):
-                    roi_mask = (self.current_spectrum[1] >= roi[0]) & (self.current_spectrum[1] <= roi[1])
-                    roi_binning = self.current_spectrum[1][roi_mask]
-                    popt = self.roi_popt[i]
-                    self.ax.axvline(x=roi[0], linestyle='--', linewidth=1, color='red')
-                    self.ax.axvline(x=roi[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
-                    self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
-                    x_annotate = roi[0] + (roi[1]-roi[0])*0.5
-                    y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max())*0.8
-                    self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
-                self.canvas.draw()
+                self.roi_draw(self.density)
             return
 
     # -------------- SELECT SPECTRUM BUTTON --------------
@@ -328,22 +322,18 @@ class SpectraPlotter(ttk.Window):
             selected_file = file_select.get()
             if selected_file:
                 self.current_file = selected_file
-                self.current_spectrum = np.histogram(io_utils.import_spectrum(selected_file), bins=self.nbins)
+                file_name = os.path.basename(selected_file)
+                if file_name.startswith('DataR'):
+                    self.treename = 'Data_R'
+                elif file_name.startswith('DataF'):
+                    self.treename = 'Data_F'
+                elif file_name.startswith('Data'):
+                    self.treename = 'Data'
+                self.current_spectrum = np.histogram(io_utils.import_spectrum(selected_file, treename=self.treename), bins=self.nbins)
                 self.plot_spectra()
                 # If some ROIs are already defined, replot them
                 if self.roi_limits:
-                    for i, roi in enumerate(self.roi_limits):
-                        roi_mask = (self.current_spectrum[1] >= roi[0]) & (self.current_spectrum[1] <= roi[1])
-                        roi_binning = self.current_spectrum[1][roi_mask]
-                        popt = self.roi_popt[i]
-                        self.ax.axvline(x=roi[0], linestyle='--', linewidth=1, color='red')
-                        self.ax.axvline(x=roi[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
-                        self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(roi[1]-(roi[1]-roi[0])*0.5, 100), fontsize=12)
-                        if self.density is False:
-                            self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
-                        else:
-                            self.ax.plot(roi_binning, (analysis_utils.GaussLine(roi_binning, popt))/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))
-                    self.canvas.draw()
+                    self.roi_draw(self.density)
                 select_window.destroy()
             else:
                 Messagebox.show_warning("Warning", "Please select a file.")
@@ -493,8 +483,12 @@ class SpectraPlotter(ttk.Window):
                     for annotation in self.ax.texts:
                         annotation.remove()
                     # Update the indices of the remaining ROIs and their annotations
-                    for i, roi in enumerate(self.roi_limits):
-                        self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(roi[1]-(roi[1]-roi[0])*0.5, 100), fontsize=12)
+                    for i, roi, popt in enumerate(zip(self.roi_limits, self.roi_popt)):
+                        roi_mask = (self.current_spectrum[1] >= roi[0]) & (self.current_spectrum[1] <= roi[1])
+                        roi_binning = self.current_spectrum[1][roi_mask]
+                        x_annotate = roi[0] + (roi[1]-roi[0])*0.5
+                        y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max()/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))*0.8
+                        self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
 
                     self.canvas.draw()
                     delete_roi_window.destroy()
