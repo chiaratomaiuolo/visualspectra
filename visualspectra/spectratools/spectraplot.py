@@ -140,6 +140,8 @@ class SpectraPlotter(ttk.Window):
         self.convert_button = ttk.Button(self, text="ADC/keV conversion", bootstyle='info', command=self.apply_conversion)
         self.convert_button.place(x=150, y=50)
 
+
+
         # Button for clearing all
         self.clear_button = ttk.Button(self, text="Clear all", bootstyle='danger', command=self.clear_all)
         self.clear_button.place(x=1120, y=10)
@@ -576,13 +578,13 @@ class SpectraPlotter(ttk.Window):
         """Open a dialog to input bin number and corresponding energy for calibration."""
         dialog = ttk.Toplevel(self)
         dialog.title("Spectrum calibration")
-        dialog.geometry("400x600")
+        dialog.geometry("500x600")
 
         # Menu a tendina per selezionare il nome del file dello spettro da calibrare
-        ttk.Label(dialog, text="Select Spectrum:").pack(pady=5)
+        ttk.Label(dialog, text="Select Spectrum:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
         spectrum_file = ttk.StringVar(value=self.current_file if self.file_paths else "")
         spectrum_menu = ttk.Combobox(dialog, textvariable=spectrum_file, values=self.file_paths)
-        spectrum_menu.pack(pady=5)
+        spectrum_menu.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
 
         tree = ttk.Treeview(dialog, columns=("Bin", "Energy"), show="headings", bootstyle='info')
         tree.heading("Bin", text="Bin Number")
@@ -590,11 +592,26 @@ class SpectraPlotter(ttk.Window):
         if self.calibration_points.get(spectrum_file.get()):
             for bin_number, energy in self.calibration_points[self.current_file]:
                 tree.insert("", "end", values=(bin_number, energy), tags=("row",))
-        tree.pack(pady=10, fill=ttk.BOTH, expand=True)
+        tree.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
 
         # Configure row height
         style = ttk.Style()
         style.configure("Treeview", rowheight=30)
+
+        # Menu a tendina per selezionare l'ID del ROI
+        ttk.Label(dialog, text="ROI ID:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        roi_id = ttk.StringVar()
+        roi_menu = ttk.Combobox(dialog, textvariable=roi_id, values=[str(i) for i in range(len(self.roi_limits))])
+        roi_menu.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
+
+        def apply_roi():
+            selected_roi = roi_id.get()
+            if selected_roi:
+                Messagebox.show_info("Info", f"Selected ROI ID: {selected_roi}")
+            else:
+                Messagebox.show_warning("Warning", "Please select a ROI ID.")
+
+        ttk.Button(dialog, text="Apply", command=apply_roi).grid(row=2, column=2, padx=10, pady=5, sticky="ew")
 
         def add_row():
             tree.insert("", "end", values=("", ""), tags=("row",))
@@ -613,7 +630,6 @@ class SpectraPlotter(ttk.Window):
                     Messagebox.show_warning("Warning", "Please enter valid numbers for bin and energy.")
                     return
             self.save_calibration(selected_file, calibration_points)
-
         def on_double_click(event):
             item = tree.selection()[0]
             column = tree.identify_column(event.x)
@@ -640,8 +656,13 @@ class SpectraPlotter(ttk.Window):
 
         tree.bind("<Double-1>", on_double_click)
 
-        ttk.Button(dialog, text="Add Row", command=add_row).pack(pady=5)
-        ttk.Button(dialog, text="Calibrate", command=on_calibrate).pack(pady=5)
+        ttk.Button(dialog, text="Add Row", command=add_row, bootstyle='info')\
+            .grid(row=3, column=0, padx=10, pady=5, sticky="ew")
+        ttk.Button(dialog, text="Calibrate", command=on_calibrate, bootstyle='info')\
+            .grid(row=3, column=1, padx=10, pady=5, sticky="ew")
+
+        dialog.grid_rowconfigure(1, weight=1)
+        dialog.grid_columnconfigure(1, weight=1)
         dialog.wait_window(dialog)
 
     def is_float(self, value):
@@ -658,10 +679,6 @@ class SpectraPlotter(ttk.Window):
         # Save the result into the calibration_points dictionary
         self.calibration_points[selected_file] = calibration_points
         self.calibration_factors[selected_file] = (m, q)
-
-        # Example: self.calibration_factors[selected_file] = [energy / bin_number for bin_number, energy in zip(bin_numbers, energies)]
-        # Apply these factors to the spectrum data
-        # ... your calibration logic ...
 
     # -------------- CONVERT UNITS BUTTON --------------
 
