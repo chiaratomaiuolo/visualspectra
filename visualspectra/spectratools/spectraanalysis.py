@@ -8,18 +8,30 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import SpanSelector
 import numpy as np
 import ROOT as root
+from scipy.optimize import curve_fit
 from uncertainties import ufloat
 # ... and eventually local modules
 import spectratools.spectraio as io_utils
 
 # ---------------------- Fit functions ----------------------
 def line(x: np.ndarray, pars: np.ndarray) -> float:
+    """ Linear function in ROOT-like format.
+    """
     return pars[0]*x + pars[1]
 
+def linear(x, m, q) -> float:
+    """ Linear function in Python-like format.
+    """
+    return m*x + q
+
 def Gauss(x, pars: np.ndarray) -> float:
+    """ Gaussian function in ROOT-like format.
+    """
     return pars[0]*np.exp(-(x-pars[1])**2/(2*pars[2]**2))
 
 def GaussLine(x, pars: np.ndarray) -> float:
+    """ Gaussian + Linear background function in ROOT-like format.
+    """
     return (pars[0]*x + pars[1]) + pars[2]/pars[4]*np.exp(-(x-pars[3])**2/(2.*pars[4]**2))
 
 # ---------------------- Initial parameters computation ----------------------
@@ -89,7 +101,6 @@ def roi_fit(spectrum: np.array, roi_min: float, roi_max: float, density: bool=Fa
     # Returning fit parameters and their errors
     return np.array(popt), np.array(dpopt)
 
-
 def onselect(spectrum, xmin, xmax, density: bool=False):
     """Callback function to handle the selection of an interval.
        Once the ROI has been selected, a fit with a GaussLine model is performed inside.
@@ -102,4 +113,22 @@ def onselect(spectrum, xmin, xmax, density: bool=False):
         print(f'{name} = {par} +/- {dpar}')
     # ... eventually returning them to the SpectraPlotter class.
     return popt, dpopt
+
+
+def calibration_fit(calibration_points: List[Tuple[float, float]]) -> Tuple[float, float]:
+    """ Function for the fitting of the calibration points.
+        The fit function is a linear function.
+    """
+    # Unpacking the calibration points
+    E_adc = np.array([point[0] for point in calibration_points])
+    E_kev = np.array([point[1] for point in calibration_points])
+
+    popt, pcov = curve_fit(linear, E_adc, E_kev)
+    m, q = popt
+    return m, q
+
+def adc_to_kev(adc: float, m: float, q: float) -> float:
+    """ Function for the conversion of an ADC value to a keV value.
+    """
+    return m*adc + q
 

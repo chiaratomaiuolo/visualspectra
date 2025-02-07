@@ -32,15 +32,21 @@ class SpectraPlotter(ttk.Window):
         if len(self.file_paths) != 0:
             self.current_file = self.file_paths[-1]
             # Importing the data of the current file
-            data = io_utils.import_spectrum(self.current_file)
+            data = io_utils.import_spectrum(self.current_file, treename=self.get_treename(self.current_file))
             # Constructing the current histogram and saving it as an attribute.
             # NB: (from Matplotlib documentation) If the data has already been 
             # binned and counted, use bar or stairs to plot the distribution. 
             self.current_spectrum = np.histogram(data, bins=self.nbins)
+        # Creating lists for storing the ROIs and their fit results
         self.roi_limits = []
         self.roi_popt = []
         self.roi_dpopt = []
         self.roi_file = [] # tracking the spectrum relative to a specific ROI
+        # Creating dictionaries containing calibration points and factors for each file
+        # Flag that indicates the x scale 
+        self.xscale_unit = 'ADC' # Default unit is ADC when canva is created
+        self.calibration_points = {}
+        self.calibration_factors = {}
         # Line to follow the cursor
         self.cursor_line = None
         # Saving possible additional arguments
@@ -126,8 +132,31 @@ class SpectraPlotter(ttk.Window):
         self.save_button = ttk.Button(self, text="Save ROI fit results", bootstyle='primary',\
                                       command=self.save_results)
         self.save_button.place(x=920, y=10)
+        # Button for inserting calibration points and calibrating the spectrum
+        self.calibrate_button = ttk.Button(self, text="Calibrate spectrum", bootstyle='info', command=self.calibrate_spectrum)
+        self.calibrate_button.place(x=10, y=50)
+
+        # Button for conversion from/to ADC/keV
+        self.convert_button = ttk.Button(self, text="ADC/keV conversion", bootstyle='info', command=self.apply_conversion)
+        self.convert_button.place(x=150, y=50)
 
 
+
+        # Button for clearing all
+        self.clear_button = ttk.Button(self, text="Clear all", bootstyle='danger', command=self.clear_all)
+        self.clear_button.place(x=1120, y=10)
+
+    @staticmethod
+    def get_treename(filepath: str | Path) -> str:
+        filename = os.path.basename(filepath)
+        if filename.startswith('DataR'):
+            return 'Data_R'
+        elif filename.startswith('DataF'):
+            return 'Data_F'
+        elif filename.startswith('Data'):
+            return 'Data'
+        else:
+            return None
 
     def plot_spectra(self, file_path: str = None):
         """ Method plotting the spectra in the User Interface canva.
@@ -140,7 +169,14 @@ class SpectraPlotter(ttk.Window):
                 return
             for file in self.file_paths:
                 try:
-                    spectrum = io_utils.import_spectrum(file, treename=self.treename)
+                    spectrum = io_utils.import_spectrum(file, treename=self.get_treename(file))
+                    # Checking x axis unit
+                    if self.xscale_unit == 'keV':
+                        if file in self.calibration_factors:
+                            m, q = self.calibration_factors[file]
+                            spectrum = analysis_utils.adc_to_kev(spectrum, m, q)
+                        else:
+                            spectrum = analysis_utils.adc_to_kev(spectrum, 1, 0)
                     if self.density is False:
                         hist = self.ax.hist(spectrum, bins=np.linspace(1,max(spectrum),self.nbins), alpha=0.6,\
                                             label=f'{os.path.basename(file)}')
@@ -159,10 +195,13 @@ class SpectraPlotter(ttk.Window):
             self.ax.legend(handles, labels, labelcolor=label_colors)
 
             # Adding the axes labels
-            self.ax.set_xlabel("Energy [ADC counts]")
+            if self.xscale_unit == 'ADC':
+                self.ax.set_xlabel("Energy [ADC counts]")
+            if self.xscale_unit == 'keV':
+                self.ax.set_xlabel("Energy [keV]")
             self.ax.set_ylabel("Counts")
             self.ax.grid(True)
-            #self.ax.autoscale()  # Autoscale the axes
+            self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
         else: # If a file path is provided, plot only that file on the current axes
             try:
@@ -170,7 +209,7 @@ class SpectraPlotter(ttk.Window):
                     for patch in self.histograms[file_path]:
                         patch.remove()
                     del self.histograms[file_path]
-                spectrum = io_utils.import_spectrum(file_path, treename=self.treename)
+                spectrum = io_utils.import_spectrum(file_path, treename=self.get_treename(file_path))
                 if self.density is False:
                     hist = self.ax.hist(spectrum[10:], bins=self.nbins, alpha=0.6,\
                                         label=f'{os.path.basename(file_path)}')
@@ -223,13 +262,7 @@ class SpectraPlotter(ttk.Window):
         if file_path:
             file_name = os.path.basename(file_path)
             self.current_file = file_path
-            if file_name.startswith('DataR'):
-                self.treename = 'Data_R'
-            elif file_name.startswith('DataF'):
-                self.treename = 'Data_F'
-            elif file_name.startswith('Data'):
-                self.treename = 'Data'
-            self.current_spectrum = np.histogram(io_utils.import_spectrum(file_path, treename=self.treename), bins=self.nbins)
+            self.current_spectrum = np.histogram(io_utils.import_spectrum(file_path, treename=self.get_treename(file_path)), bins=self.nbins)
             self.file_paths.append(file_path)
             self.plot_spectra()
             if self.roi_limits:
@@ -321,14 +354,7 @@ class SpectraPlotter(ttk.Window):
             selected_file = file_select.get()
             if selected_file:
                 self.current_file = selected_file
-                file_name = os.path.basename(selected_file)
-                if file_name.startswith('DataR'):
-                    self.treename = 'Data_R'
-                elif file_name.startswith('DataF'):
-                    self.treename = 'Data_F'
-                elif file_name.startswith('Data'):
-                    self.treename = 'Data'
-                self.current_spectrum = np.histogram(io_utils.import_spectrum(selected_file, treename=self.treename), bins=self.nbins)
+                self.current_spectrum = np.histogram(io_utils.import_spectrum(selected_file, treename=self.get_treename(selected_file)), bins=self.nbins)
                 self.plot_spectra()
                 # If some ROIs are already defined, replot them
                 if self.roi_limits:
@@ -546,6 +572,131 @@ class SpectraPlotter(ttk.Window):
         ttk.Button(dialog, text="OK", command=on_ok).pack(pady=10)
         dialog.wait_window(dialog)
         return file_name_var.get()
+    
+    # -------------- CALIBRATE SPECTRUM BUTTON ----------------
+    def calibrate_spectrum(self):
+        """Open a dialog to input bin number and corresponding energy for calibration."""
+        dialog = ttk.Toplevel(self)
+        dialog.title("Spectrum calibration")
+        dialog.geometry("400x600")
+
+        # Menu a tendina per selezionare il nome del file dello spettro da calibrare
+        ttk.Label(dialog, text="Select Spectrum:").pack(pady=5)
+        spectrum_file = ttk.StringVar(value=self.current_file if self.file_paths else "")
+        spectrum_menu = ttk.Combobox(dialog, textvariable=spectrum_file, values=self.file_paths)
+        spectrum_menu.pack(pady=5)
+
+        tree = ttk.Treeview(dialog, columns=("Bin", "Energy"), show="headings", bootstyle='info')
+        tree.heading("Bin", text="Bin Number")
+        tree.heading("Energy", text="Energy [keV]")
+        if self.calibration_points.get(spectrum_file.get()):
+            for bin_number, energy in self.calibration_points[self.current_file]:
+                tree.insert("", "end", values=(bin_number, energy), tags=("row",))
+        tree.pack(pady=10, fill=ttk.BOTH, expand=True)
+
+        # Configure row height
+        style = ttk.Style()
+        style.configure("Treeview", rowheight=30)
+
+        def add_row():
+            tree.insert("", "end", values=("", ""), tags=("row",))
+
+        def on_calibrate():
+            selected_file = spectrum_file.get()
+            if not selected_file:
+                Messagebox.show_warning("Warning", "Please select a spectrum file.")
+                return
+            calibration_points = [] #List filled with tuples (bin_number, energy)
+            for row in tree.get_children():
+                bin_number, energy = tree.item(row)["values"]
+                if type(bin_number) == int and self.is_float(energy):
+                    calibration_points.append((int(bin_number), float(energy)))
+                else:
+                    Messagebox.show_warning("Warning", "Please enter valid numbers for bin and energy.")
+                    return
+            self.save_calibration(selected_file, calibration_points)
+            dialog.destroy()
+
+        def on_double_click(event):
+            item = tree.selection()[0]
+            column = tree.identify_column(event.x)
+            column_index = int(column[1:]) - 1
+            x, y, width, height = tree.bbox(item, column)
+            value = tree.item(item, 'values')[column_index]
+            entry = ttk.Entry(dialog)
+            entry.place(x=x + tree.winfo_rootx() - dialog.winfo_rootx(),\
+                        y=y + tree.winfo_rooty() - dialog.winfo_rooty(),\
+                        width=width, height=height)
+            entry.insert(0, value)
+            entry.focus()
+
+            def on_focus_out(event):
+                tree.set(item, column, entry.get())
+                entry.destroy()
+
+            def on_return(event):
+                tree.set(item, column, entry.get())
+                entry.destroy()
+
+            entry.bind("<FocusOut>", on_focus_out)
+            entry.bind("<Return>", on_return)
+
+        tree.bind("<Double-1>", on_double_click)
+
+        ttk.Button(dialog, text="Add Row", command=add_row).pack(pady=5)
+        ttk.Button(dialog, text="Calibrate", command=on_calibrate).pack(pady=5)
+        dialog.wait_window(dialog)
+
+    def is_float(self, value):
+        try:
+            float(value)
+            return True
+        except ValueError:
+            return False
+
+    def save_calibration(self, selected_file, calibration_points):
+        """Apply the calibration to the spectrum."""
+        # Fitting a line to calibration points
+        m, q = analysis_utils.calibration_fit(calibration_points)
+        # Save the result into the calibration_points dictionary
+        self.calibration_points[selected_file] = calibration_points
+        self.calibration_factors[selected_file] = (m, q)
+
+        # Example: self.calibration_factors[selected_file] = [energy / bin_number for bin_number, energy in zip(bin_numbers, energies)]
+        # Apply these factors to the spectrum data
+        # ... your calibration logic ...
+
+    # -------------- CONVERT UNITS BUTTON --------------
+
+    def apply_conversion(self):
+        # Converting from ADC to keV
+        if self.xscale_unit == 'ADC':
+            self.xscale_unit = 'keV'
+            self.plot_spectra()
+        elif self.xscale_unit == 'keV':
+            self.xscale_unit = 'ADC'
+            self.plot_spectra()
+    
+    # -------------- CLEAR ALL BUTTON --------------
+    def clear_all(self):
+        if not self.file_paths:
+            Messagebox.show_warning("Warning", "No files to clear.")
+            return
+        # Clear all histograms from the plot
+        for file in self.file_paths:
+            if file in self.histograms:
+                for patch in self.histograms[file]:
+                    patch.remove()
+                del self.histograms[file]
+        self.file_paths = []
+        self.current_file = None
+        self.current_spectrum = None
+        self.roi_limits = []
+        self.roi_popt = []
+        self.roi_dpopt = []
+        self.roi_file = []
+        self.ax.clear()
+        self.canvas.draw()
 
     # -------------- CLOSING PROTOCOL --------------
     def on_closing(self):
