@@ -132,7 +132,7 @@ class SpectraPlotter(ttk.Window):
 
         # Button for clearing all
         self.clear_button = ttk.Button(self, text="Clear all", bootstyle='danger', command=self.clear_all)
-        self.clear_button.place(x=10, y=90)
+        self.clear_button.place(x=1120, y=10)
 
     @staticmethod
     def get_treename(filepath: str | Path) -> str:
