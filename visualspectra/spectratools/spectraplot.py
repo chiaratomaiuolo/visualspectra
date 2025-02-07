@@ -37,10 +37,16 @@ class SpectraPlotter(ttk.Window):
             # NB: (from Matplotlib documentation) If the data has already been 
             # binned and counted, use bar or stairs to plot the distribution. 
             self.current_spectrum = np.histogram(data, bins=self.nbins)
+        # Creating lists for storing the ROIs and their fit results
         self.roi_limits = []
         self.roi_popt = []
         self.roi_dpopt = []
         self.roi_file = [] # tracking the spectrum relative to a specific ROI
+        # Creating dictionaries containing calibration points and factors for each file
+        # Flag that indicates the x scale 
+        self.xscale_unit = 'ADC' # Default unit is ADC when canva is created
+        self.calibration_points = {}
+        self.calibration_factors = {}
         # Line to follow the cursor
         self.cursor_line = None
         # Saving possible additional arguments
@@ -130,6 +136,12 @@ class SpectraPlotter(ttk.Window):
         self.calibrate_button = ttk.Button(self, text="Calibrate spectrum", bootstyle='info', command=self.calibrate_spectrum)
         self.calibrate_button.place(x=10, y=50)
 
+        # Button for conversion from/to ADC/keV
+        self.convert_button = ttk.Button(self, text="ADC/keV conversion", bootstyle='info', command=self.apply_conversion)
+        self.convert_button.place(x=150, y=50)
+
+
+
         # Button for clearing all
         self.clear_button = ttk.Button(self, text="Clear all", bootstyle='danger', command=self.clear_all)
         self.clear_button.place(x=1120, y=10)
@@ -158,6 +170,13 @@ class SpectraPlotter(ttk.Window):
             for file in self.file_paths:
                 try:
                     spectrum = io_utils.import_spectrum(file, treename=self.get_treename(file))
+                    # Checking x axis unit
+                    if self.xscale_unit == 'keV':
+                        if file in self.calibration_factors:
+                            m, q = self.calibration_factors[file]
+                            spectrum = analysis_utils.adc_to_kev(spectrum, m, q)
+                        else:
+                            spectrum = analysis_utils.adc_to_kev(spectrum, 1, 0)
                     if self.density is False:
                         hist = self.ax.hist(spectrum, bins=np.linspace(1,max(spectrum),self.nbins), alpha=0.6,\
                                             label=f'{os.path.basename(file)}')
@@ -176,10 +195,13 @@ class SpectraPlotter(ttk.Window):
             self.ax.legend(handles, labels, labelcolor=label_colors)
 
             # Adding the axes labels
-            self.ax.set_xlabel("Energy [ADC counts]")
+            if self.xscale_unit == 'ADC':
+                self.ax.set_xlabel("Energy [ADC counts]")
+            if self.xscale_unit == 'keV':
+                self.ax.set_xlabel("Energy [keV]")
             self.ax.set_ylabel("Counts")
             self.ax.grid(True)
-            #self.ax.autoscale()  # Autoscale the axes
+            self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
         else: # If a file path is provided, plot only that file on the current axes
             try:
@@ -556,11 +578,20 @@ class SpectraPlotter(ttk.Window):
         """Open a dialog to input bin number and corresponding energy for calibration."""
         dialog = ttk.Toplevel(self)
         dialog.title("Spectrum calibration")
-        dialog.geometry("400x300")
+        dialog.geometry("400x600")
+
+        # Menu a tendina per selezionare il nome del file dello spettro da calibrare
+        ttk.Label(dialog, text="Select Spectrum:").pack(pady=5)
+        spectrum_file = ttk.StringVar(value=self.current_file if self.file_paths else "")
+        spectrum_menu = ttk.Combobox(dialog, textvariable=spectrum_file, values=self.file_paths)
+        spectrum_menu.pack(pady=5)
 
         tree = ttk.Treeview(dialog, columns=("Bin", "Energy"), show="headings", bootstyle='info')
         tree.heading("Bin", text="Bin Number")
         tree.heading("Energy", text="Energy [keV]")
+        if self.calibration_points.get(spectrum_file.get()):
+            for bin_number, energy in self.calibration_points[self.current_file]:
+                tree.insert("", "end", values=(bin_number, energy), tags=("row",))
         tree.pack(pady=10, fill=ttk.BOTH, expand=True)
 
         # Configure row height
@@ -571,17 +602,19 @@ class SpectraPlotter(ttk.Window):
             tree.insert("", "end", values=("", ""), tags=("row",))
 
         def on_calibrate():
-            bin_numbers = []
-            energies = []
+            selected_file = spectrum_file.get()
+            if not selected_file:
+                Messagebox.show_warning("Warning", "Please select a spectrum file.")
+                return
+            calibration_points = [] #List filled with tuples (bin_number, energy)
             for row in tree.get_children():
                 bin_number, energy = tree.item(row)["values"]
-                if bin_number.isdigit() and self.is_float(energy):
-                    bin_numbers.append(int(bin_number))
-                    energies.append(float(energy))
+                if type(bin_number) == int and self.is_float(energy):
+                    calibration_points.append((int(bin_number), float(energy)))
                 else:
                     Messagebox.show_warning("Warning", "Please enter valid numbers for bin and energy.")
                     return
-            self.apply_calibration(bin_numbers, energies)
+            self.save_calibration(selected_file, calibration_points)
             dialog.destroy()
 
         def on_double_click(event):
@@ -620,14 +653,29 @@ class SpectraPlotter(ttk.Window):
             return True
         except ValueError:
             return False
-        
-    def apply_calibration(self, bin_numbers, energies):
+
+    def save_calibration(self, selected_file, calibration_points):
         """Apply the calibration to the spectrum."""
-        # Implement the calibration logic here
-        print(f"Calibrating bins {bin_numbers} to energies {energies} keV")
-        # Example: self.calibration_factors = [energy / bin_number for bin_number, energy in zip(bin_numbers, energies)]
+        # Fitting a line to calibration points
+        m, q = analysis_utils.calibration_fit(calibration_points)
+        # Save the result into the calibration_points dictionary
+        self.calibration_points[selected_file] = calibration_points
+        self.calibration_factors[selected_file] = (m, q)
+
+        # Example: self.calibration_factors[selected_file] = [energy / bin_number for bin_number, energy in zip(bin_numbers, energies)]
         # Apply these factors to the spectrum data
         # ... your calibration logic ...
+
+    # -------------- CONVERT UNITS BUTTON --------------
+
+    def apply_conversion(self):
+        # Converting from ADC to keV
+        if self.xscale_unit == 'ADC':
+            self.xscale_unit = 'keV'
+            self.plot_spectra()
+        elif self.xscale_unit == 'keV':
+            self.xscale_unit = 'ADC'
+            self.plot_spectra()
     
     # -------------- CLEAR ALL BUTTON --------------
     def clear_all(self):
