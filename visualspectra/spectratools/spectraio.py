@@ -11,7 +11,6 @@ import os
 import sys
 from typing import Tuple
 # ... then installed libraries...
-import matplotlib.pyplot as plt
 import numpy as np
 import uproot
 # ... and eventually local modules

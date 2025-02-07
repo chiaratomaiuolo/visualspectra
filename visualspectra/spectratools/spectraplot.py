@@ -140,8 +140,6 @@ class SpectraPlotter(ttk.Window):
         self.convert_button = ttk.Button(self, text="ADC/keV conversion", bootstyle='info', command=self.apply_conversion)
         self.convert_button.place(x=150, y=50)
 
-
-
         # Button for clearing all
         self.clear_button = ttk.Button(self, text="Clear all", bootstyle='danger', command=self.clear_all)
         self.clear_button.place(x=1120, y=10)
