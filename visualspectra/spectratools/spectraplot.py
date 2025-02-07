@@ -695,6 +695,9 @@ class SpectraPlotter(ttk.Window):
         self.roi_popt = []
         self.roi_dpopt = []
         self.roi_file = []
+        self.xscale_unit = 'ADC' # Default unit is ADC when canva is created
+        self.calibration_points = {}
+        self.calibration_factors = {}
         self.ax.clear()
         self.canvas.draw()
 
