@@ -15,15 +15,23 @@ import spectratools.spectraio as io_utils
 
 # ---------------------- Fit functions ----------------------
 def line(x: np.ndarray, pars: np.ndarray) -> float:
+    """ Linear function in ROOT-like format.
+    """
     return pars[0]*x + pars[1]
 
 def linear(x, m, q) -> float:
+    """ Linear function in Python-like format.
+    """
     return m*x + q
 
 def Gauss(x, pars: np.ndarray) -> float:
+    """ Gaussian function in ROOT-like format.
+    """
     return pars[0]*np.exp(-(x-pars[1])**2/(2*pars[2]**2))
 
 def GaussLine(x, pars: np.ndarray) -> float:
+    """ Gaussian + Linear background function in ROOT-like format.
+    """
     return (pars[0]*x + pars[1]) + pars[2]/pars[4]*np.exp(-(x-pars[3])**2/(2.*pars[4]**2))
 
 # ---------------------- Initial parameters computation ----------------------
