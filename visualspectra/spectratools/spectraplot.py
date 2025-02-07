@@ -615,7 +615,6 @@ class SpectraPlotter(ttk.Window):
                     Messagebox.show_warning("Warning", "Please enter valid numbers for bin and energy.")
                     return
             self.save_calibration(selected_file, calibration_points)
-            dialog.destroy()
 
         def on_double_click(event):
             item = tree.selection()[0]
