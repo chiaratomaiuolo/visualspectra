@@ -186,7 +186,7 @@ class SpectraPlotter(ttk.Window):
                                             label=f'{os.path.basename(file)}', density=True)
                         self.histograms[file] = hist[2]  # Save the patches (rectangles) of the histogram
                 except FileNotFoundError:
-                    Messagebox.show_warning("Warning", f"File {file} not found.")
+                    Messagebox.show_warning(f"File {file} not found.", "Warning")
 
             # Update legend with custom colors
             handles, labels = self.ax.get_legend_handles_labels()
@@ -274,7 +274,7 @@ class SpectraPlotter(ttk.Window):
     # -------------- REBIN SPECTRA BUTTON --------------
     def rebin_spectra(self):
         if not self.file_paths:
-            Messagebox.show_warning("Warning", "No files to rebin.")
+            Messagebox.show_warning("No files to rebin.", "Warning")
             return
 
         # Create a new window for rebinning
@@ -307,7 +307,7 @@ class SpectraPlotter(ttk.Window):
                 self.plot_spectra(file_path=selected_file)
                 rebin_window.destroy()
             else:
-                Messagebox.show_warning("Warning", "Please select a file and number of bins.")
+                Messagebox.show_warning("Please select a file and number of bins.", "Warning")
 
         apply_button = ttk.Button(rebin_window, text="Apply", command=apply_rebin)
         apply_button.pack(pady=10)
@@ -316,7 +316,7 @@ class SpectraPlotter(ttk.Window):
     # -------------- NORMALIZE SPECTRA BUTTON --------------
     def normalize_spectra(self):
         if not self.file_paths:
-            Messagebox.show_warning("Warning", "No histogram to normalize.")
+            Messagebox.show_warning("No histogram to normalize.", "Warning")
             return
         if self.density is False:
             self.density = True
@@ -337,7 +337,7 @@ class SpectraPlotter(ttk.Window):
     # -------------- SELECT SPECTRUM BUTTON --------------
     def select_spectrum(self):
         if not self.file_paths:
-            Messagebox.show_warning("Warning", "No files to rebin.")
+            Messagebox.show_warning("No files to rebin.", "Warning")
             return
         # Create a new window for rebinning
         select_window = ttk.Toplevel(self)
@@ -361,7 +361,7 @@ class SpectraPlotter(ttk.Window):
                     self.roi_draw(self.density)
                 select_window.destroy()
             else:
-                Messagebox.show_warning("Warning", "Please select a file.")
+                Messagebox.show_warning("Please select a file.", "Warning")
 
         apply_button = ttk.Button(select_window, text="Apply", command=apply_selection)
         apply_button.pack(pady=10)
@@ -369,7 +369,7 @@ class SpectraPlotter(ttk.Window):
     # -------------- DELETE FILE BUTTON --------------
     def delete_file(self):
         if not self.file_paths:
-            Messagebox.show_warning("Warning", "No file selected.")
+            Messagebox.show_warning("No file selected.", "Warning")
             return
         # Create a new window for rebinning
         delete_window = ttk.Toplevel(self)
@@ -393,7 +393,7 @@ class SpectraPlotter(ttk.Window):
                 self.plot_spectra()
                 delete_window.destroy()
             else:
-                Messagebox.show_warning("Warning", "Please select a file.")
+                Messagebox.show_warning("Please select a file.", "Warning")
 
         apply_button = ttk.Button(delete_window, text="Apply", command=apply_deletion)
         apply_button.pack(pady=10)
@@ -462,7 +462,7 @@ class SpectraPlotter(ttk.Window):
     # -------------- DELETE ROI BUTTON --------------
     def delete_roi(self):
         if not self.roi_limits:
-            Messagebox.show_warning("Warning", "No ROI to delete.")
+            Messagebox.show_warning("No ROI to delete.", "Warning")
             return
         # Create a new window for ROI selection
         delete_roi_window = ttk.Toplevel(self)
@@ -518,7 +518,7 @@ class SpectraPlotter(ttk.Window):
                     self.canvas.draw()
                     delete_roi_window.destroy()
             else:
-                Messagebox.show_warning("Warning", "Please select a ROI.")
+                Messagebox.show_warning("Please select a ROI.", "Warning")
 
         apply_button = ttk.Button(delete_roi_window, text="Apply", command=apply_roideletion)
         apply_button.pack(pady=10)
@@ -526,13 +526,13 @@ class SpectraPlotter(ttk.Window):
     # -------------- SAVE RESULTS BUTTON --------------
     def save_results(self):
         if not self.roi_limits:
-            Messagebox.show_warning("Warning", "No ROI to save.")
+            Messagebox.show_warning("No ROI to save", "Warning")
             return
         else:
             # Chiedi all'utente di inserire il nome del file
             file_name = self.ask_file_name()
             if not file_name:
-                Messagebox.show_warning("Warning", "File name cannot be empty.")
+                Messagebox.show_warning("File name cannot be empty", "Warning")
                 return
 
             # Ottieni la data e l'ora corrente
@@ -621,7 +621,7 @@ class SpectraPlotter(ttk.Window):
         def on_calibrate():
             selected_file = spectrum_file.get()
             if not selected_file:
-                Messagebox.show_warning("Warning", "Please select a spectrum file.")
+                Messagebox.show_warning("Please select a spectrum file", "Warning")
                 return
             calibration_points = [] #List filled with tuples (bin_number, energy)
             for row in tree.get_children():
@@ -629,7 +629,7 @@ class SpectraPlotter(ttk.Window):
                 if type(bin_number) == int and self.is_float(energy):
                     calibration_points.append((int(bin_number), float(energy)))
                 else:
-                    Messagebox.show_warning("Warning", "Please enter valid numbers for bin and energy.")
+                    Messagebox.show_warning("Please enter valid numbers for bin and energy", "Warning")
                     return
             self.save_calibration(selected_file, calibration_points)
         def on_double_click(event):
@@ -696,7 +696,7 @@ class SpectraPlotter(ttk.Window):
     # -------------- CLEAR ALL BUTTON --------------
     def clear_all(self):
         if not self.file_paths:
-            Messagebox.show_warning("Warning", "No files to clear.")
+            Messagebox.show_warning("No files to clear", "Warning")
             return
         # Clear all histograms from the plot
         for file in self.file_paths:
