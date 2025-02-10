@@ -605,16 +605,18 @@ class SpectraPlotter(ttk.Window):
         roi_menu.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
 
         def apply_roi():
-            selected_roi = roi_id.get()
-            if selected_roi:
-                Messagebox.show_info("Info", f"Selected ROI ID: {selected_roi}")
+            selected_roi = int(roi_id.get())
+            if selected_roi is not None:
+                # We want to use the ROI centroid as the energy value
+                tree.insert("", "end", values=(f"{self.roi_popt[selected_roi][3]}", ""), tags=("row",))
             else:
-                Messagebox.show_warning("Warning", "Please select a ROI ID.")
+                Messagebox.show_warning("Please select a ROI ID.", "Warning")
 
         ttk.Button(dialog, text="Apply", command=apply_roi).grid(row=2, column=2, padx=10, pady=5, sticky="ew")
 
         def add_row():
             tree.insert("", "end", values=("", ""), tags=("row",))
+
 
         def on_calibrate():
             selected_file = spectrum_file.get()
