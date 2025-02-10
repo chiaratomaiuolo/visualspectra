@@ -627,7 +627,7 @@ class SpectraPlotter(ttk.Window):
             calibration_points = [] #List filled with tuples (bin_number, energy)
             for row in tree.get_children():
                 bin_number, energy = tree.item(row)["values"]
-                if type(bin_number) == int and self.is_float(energy):
+                if self.is_float(bin_number) and self.is_float(energy):
                     calibration_points.append((int(bin_number), float(energy)))
                 else:
                     Messagebox.show_warning("Please enter valid numbers for bin and energy", "Warning")
