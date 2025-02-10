@@ -589,6 +589,7 @@ class SpectraPlotter(ttk.Window):
         tree = ttk.Treeview(dialog, columns=("Bin", "Energy"), show="headings", bootstyle='info')
         tree.heading("Bin", text="Bin Number")
         tree.heading("Energy", text="Energy [keV]")
+        tree.insert("", "end", values=(0, 0), tags=("row",))
         if self.calibration_points.get(spectrum_file.get()):
             for bin_number, energy in self.calibration_points[self.current_file]:
                 tree.insert("", "end", values=(bin_number, energy), tags=("row",))
