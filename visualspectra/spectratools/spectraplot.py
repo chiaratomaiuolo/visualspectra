@@ -235,12 +235,24 @@ class SpectraPlotter(ttk.Window):
     def roi_draw(self, density):
         for i, roi in enumerate(self.roi_limits):
             roi_mask = (self.current_spectrum[1] >= roi[0]) & (self.current_spectrum[1] <= roi[1])
-            roi_binning = self.current_spectrum[1][roi_mask]
+            roi_binning = self.current_spectrum[1][roi_mask] #Filtered bins content
             popt = self.roi_popt[i]
+            if self.xscale_unit == 'keV':
+                # Need to rescale the ROI limits
+                m, q = self.calibration_factors[self.roi_file[i]]
+                roi = (analysis_utils.adc_to_kev(np.array([roi[0]]), m, q),\
+                       analysis_utils.adc_to_kev(np.array([roi[1]]), m, q))
+                roi_binning = analysis_utils.adc_to_kev(self.current_spectrum[1][roi_mask], m, q)
+                # Rescaling fit parameters
+                #popt = analysis_utils.adc_to_kev(popt, m, q)
+                #popt[2] = popt[2]
+                popt = [popt[0]/m, popt[1]-(q/m)*popt[0], popt[2]*m, m*(popt[3]+q), popt[4]*m]
             self.ax.axvline(x=roi[0], linestyle='--', linewidth=1, color='red')
             self.ax.axvline(x=roi[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
             if density is False:
-                self.ax.plot(roi_binning, analysis_utils.GaussLine(roi_binning, popt))
+                print(popt)
+                w = np.linspace(min(roi_binning), max(roi_binning), 1000)
+                self.ax.plot(w, analysis_utils.GaussLine(w, popt))
                 x_annotate = roi[0] + (roi[1]-roi[0])*0.5
                 y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max())*0.8
                 self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
@@ -589,6 +601,7 @@ class SpectraPlotter(ttk.Window):
         tree = ttk.Treeview(dialog, columns=("Bin", "Energy"), show="headings", bootstyle='info')
         tree.heading("Bin", text="Bin Number")
         tree.heading("Energy", text="Energy [keV]")
+        # Need an if that looks if there are no rows []
         tree.insert("", "end", values=(0, 0), tags=("row",))
         if self.calibration_points.get(spectrum_file.get()):
             for bin_number, energy in self.calibration_points[self.current_file]:
@@ -628,7 +641,7 @@ class SpectraPlotter(ttk.Window):
             for row in tree.get_children():
                 bin_number, energy = tree.item(row)["values"]
                 if self.is_float(bin_number) and self.is_float(energy):
-                    calibration_points.append((int(bin_number), float(energy)))
+                    calibration_points.append((float(bin_number), float(energy)))
                 else:
                     Messagebox.show_warning("Please enter valid numbers for bin and energy", "Warning")
                     return
@@ -690,9 +703,13 @@ class SpectraPlotter(ttk.Window):
         if self.xscale_unit == 'ADC':
             self.xscale_unit = 'keV'
             self.plot_spectra()
+            if self.roi_limits:
+                self.roi_draw(self.density)
         elif self.xscale_unit == 'keV':
             self.xscale_unit = 'ADC'
             self.plot_spectra()
+            if self.roi_limits:
+                self.roi_draw(self.density)
     
     # -------------- CLEAR ALL BUTTON --------------
     def clear_all(self):
