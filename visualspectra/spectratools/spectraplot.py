@@ -630,6 +630,11 @@ class SpectraPlotter(ttk.Window):
 
         def add_row():
             tree.insert("", "end", values=("", ""), tags=("row",))
+        
+        def delete_row():
+            selected_item = tree.selection()
+            if selected_item:
+                tree.delete(selected_item)
 
 
         def on_calibrate():
@@ -674,8 +679,10 @@ class SpectraPlotter(ttk.Window):
 
         ttk.Button(dialog, text="Add Row", command=add_row, bootstyle='info')\
             .grid(row=3, column=0, padx=10, pady=5, sticky="ew")
-        ttk.Button(dialog, text="Calibrate", command=on_calibrate, bootstyle='info')\
+        ttk.Button(dialog, text="Delete Row", command=delete_row, bootstyle='danger')\
             .grid(row=3, column=1, padx=10, pady=5, sticky="ew")
+        ttk.Button(dialog, text="Calibrate", command=on_calibrate, bootstyle='info')\
+            .grid(row=3, column=2, padx=10, pady=5, sticky="ew")
 
         dialog.grid_rowconfigure(1, weight=1)
         dialog.grid_columnconfigure(1, weight=1)
