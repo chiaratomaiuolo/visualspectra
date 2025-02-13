@@ -404,8 +404,8 @@ class SpectraPlotter(ttk.Window):
 
     # -------------- SELECT SPECTRUM BUTTON --------------
     def select_spectrum(self):
-        if not self.file_paths:
-            Messagebox.show_warning("No files to rebin.", "Warning")
+        if not self.opened_spectra.keys():
+            Messagebox.show_warning("No files to select.", "Warning")
             return
         # Create a new window for rebinning
         select_window = ttk.Toplevel(self)
@@ -415,7 +415,7 @@ class SpectraPlotter(ttk.Window):
         ttk.Label(select_window, text="Select File:").pack(pady=10)
         file_select = ttk.StringVar(select_window)
         file_menu_select = ttk.Combobox(select_window, textvariable=file_select,\
-                                        values=self.opened_spectra.keys())
+                                        values=list(self.opened_spectra.keys()))
         file_menu_select.pack(pady=10)
 
         def apply_selection():
@@ -447,7 +447,7 @@ class SpectraPlotter(ttk.Window):
         ttk.Label(delete_window, text="Select File:").pack(pady=10)
         file_delete = ttk.StringVar(delete_window)
         file_menu_delete = ttk.Combobox(delete_window, textvariable=file_delete,\
-                                        values=self.opened_spectra.keys())
+                                        values=list(self.opened_spectra.keys()))
         file_menu_delete.pack(pady=10)
 
         def apply_deletion():
@@ -618,7 +618,8 @@ class SpectraPlotter(ttk.Window):
                                 xytext=(x_annotate, y_annotate), fontsize=12)
                             else:
                                 # Decrementing the ROI number
-                                rois['roi_numbers'][roi_id] -= 1
+                                index = rois['roi_numbers'].index(roi_id)
+                                rois['roi_numbers'][index] -= 1
                                 # Updating the annotation
                                 self.ax.annotate(f'{roi_id - 1}', xy=(roi_lims[0], 0),\
                                 xytext=(x_annotate, y_annotate), fontsize=12)
@@ -704,7 +705,7 @@ class SpectraPlotter(ttk.Window):
         # Menu a tendina per selezionare il nome del file dello spettro da calibrare
         ttk.Label(dialog, text="Select Spectrum:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
         spectrum_file = ttk.StringVar(value=self.current_file if self.opened_spectra.keys() else "")
-        spectrum_menu = ttk.Combobox(dialog, textvariable=spectrum_file, values=self.opened_spectra.keys())
+        spectrum_menu = ttk.Combobox(dialog, textvariable=spectrum_file, values=list(self.opened_spectra.keys()))
         spectrum_menu.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
 
         tree = ttk.Treeview(dialog, columns=("Bin", "Energy"), show="headings", bootstyle='info')
