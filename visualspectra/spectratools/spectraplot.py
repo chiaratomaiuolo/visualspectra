@@ -23,30 +23,40 @@ class SpectraPlotter(ttk.Window):
         super().__init__(themename="flatly")
         # Setting closing protocol
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
-        # Loading file paths as class attributes
-        self.file_paths = file_paths
-        self.nbins = nbins
-        self.density = False
+        # Creating a dictionary of dictionaries containing the infos about the
+        # opened files
+        self.nbins = nbins # It is needed for having a standard when adding new files
+        self.opened_spectra = {
+            file: {
+                'data': io_utils.import_spectrum(self.current_file, treename=self.get_treename(self.current_file)),
+                'nbins': nbins,
+                'histogram': np.histogram(file['data'], bins=self.nbins),
+                'rois' : {
+                        'roi_numbers': [],
+                        'roi_limits': [],
+                        'roi_popt': [],
+                        'roi_dpopt': [],
+                },
+                'calibration_points': [],
+                'calibration_factors': []
+            } for file in file_paths
+        }
         # Setting the 'current file' for fit purposes
         # to the last file in the list
-        if len(self.file_paths) != 0:
-            self.current_file = self.file_paths[-1]
+        if len(self.opened_spectra) != 0:
+            self.current_file = self.opened_spectra.keys()[-1]
             # Importing the data of the current file
-            data = io_utils.import_spectrum(self.current_file, treename=self.get_treename(self.current_file))
+            # -> data = io_utils.import_spectrum(self.current_file, treename=self.get_treename(self.current_file))
             # Constructing the current histogram and saving it as an attribute.
             # NB: (from Matplotlib documentation) If the data has already been 
             # binned and counted, use bar or stairs to plot the distribution. 
-            self.current_spectrum = np.histogram(data, bins=self.nbins)
-        # Creating lists for storing the ROIs and their fit results
-        self.roi_limits = []
-        self.roi_popt = []
-        self.roi_dpopt = []
-        self.roi_file = [] # tracking the spectrum relative to a specific ROI
+            self.current_spectrum = np.histogram(self.opened_spectra[file_paths[-1]]['data'],\
+                                                 bins=self.opened_spectra[file_paths[-1]]['nbins'])
         # Creating dictionaries containing calibration points and factors for each file
         # Flag that indicates the x scale 
+        self.density = False
         self.xscale_unit = 'ADC' # Default unit is ADC when canva is created
-        self.calibration_points = {}
-        self.calibration_factors = {}
+        self.current_roi_number = None # Counter for the ROIs
         # Line to follow the cursor
         self.cursor_line = None
         # Saving possible additional arguments
@@ -163,35 +173,36 @@ class SpectraPlotter(ttk.Window):
         """
         if not file_path: # If a file path is not provided, plot (or re-plot) all opened files
             self.ax.clear()
-            if len(self.file_paths) == 0:
+            if len(self.opened_spectra) == 0:
                 # If there are no files to plot, just opening a white window
                 self.canvas.draw()
                 return
-            for file in self.file_paths:
+            for file_name, file_content in self.opened_spectra.items():
                 try:
-                    spectrum = io_utils.import_spectrum(file, treename=self.get_treename(file))
+                    spectrum = file_content['data']
+                    nbins = file_content['nbins']
                     # Checking x axis unit
                     if self.xscale_unit == 'keV':
-                        if file in self.calibration_factors:
-                            m, q = self.calibration_factors[file]
+                        if file_content['calibration_factors']: # If calibration factors are present
+                            m, q = file_content['calibration_factors']
                             spectrum = analysis_utils.adc_to_kev(spectrum, m, q)
                         else:
                             spectrum = analysis_utils.adc_to_kev(spectrum, 1, 0)
                     if self.density is False:
-                        hist = self.ax.hist(spectrum, bins=np.linspace(1,max(spectrum),self.nbins), alpha=0.6,\
-                                            label=f'{os.path.basename(file)}')
-                        self.histograms[file] = hist[2]  # Save the patches (rectangles) of the histogram
+                        hist = self.ax.hist(spectrum, bins=np.linspace(1, max(spectrum), nbins), alpha=0.6,\
+                                            label=f'{os.path.basename(file_name)}')
+                        self.histograms[file_name] = hist[2]  # Save the patches (rectangles) of the histogram
                     else:
-                        hist = self.ax.hist(spectrum, bins=np.linspace(1,max(spectrum),self.nbins), alpha=0.6,\
-                                            label=f'{os.path.basename(file)}', density=True)
-                        self.histograms[file] = hist[2]  # Save the patches (rectangles) of the histogram
+                        hist = self.ax.hist(spectrum, bins=np.linspace(1,max(spectrum), nbins), alpha=0.6,\
+                                            label=f'{os.path.basename(file_name)}', density=True)
+                        self.histograms[file_name] = hist[2]  # Save the patches (rectangles) of the histogram
                 except FileNotFoundError:
-                    Messagebox.show_warning(f"File {file} not found.", "Warning")
+                    Messagebox.show_warning(f"File {file_name} not found.", "Warning")
 
-            # Update legend with custom colors
+                # Update legend with custom colors
             handles, labels = self.ax.get_legend_handles_labels()
-            label_colors = ['red' if self.file_paths[i] == self.current_file\
-                            else 'black' for i in range(len(labels))]
+            label_colors = ['red' if key == self.current_file\
+                            else 'black' for key in self.opened_spectra.keys()]
             self.ax.legend(handles, labels, labelcolor=label_colors)
 
             # Adding the axes labels
@@ -204,63 +215,69 @@ class SpectraPlotter(ttk.Window):
             self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
         else: # If a file path is provided, plot only that file on the current axes
+            spectrum = self.opened_spectra[file_path]['data']
+            nbins = self.opened_spectra[file_path]['nbins']
             try:
                 if file_path in self.histograms:
                     for patch in self.histograms[file_path]:
                         patch.remove()
                     del self.histograms[file_path]
-                spectrum = io_utils.import_spectrum(file_path, treename=self.get_treename(file_path))
+                spectrum = self.opened_spectra[file_path]['data']
                 if self.density is False:
-                    hist = self.ax.hist(spectrum[10:], bins=self.nbins, alpha=0.6,\
+                    hist = self.ax.hist(spectrum, bins=nbins, alpha=0.6,\
                                         label=f'{os.path.basename(file_path)}')
                     self.histograms[file_path] = hist[2]  # Save the patches of the histogram
                 else:
-                    hist = self.ax.hist(spectrum[10:], bins=self.nbins, alpha=0.6,\
-                                        label=f'{os.path.basename(file_path)}', density=True)
+                    hist = self.ax.hist(spectrum, bins=self.opened_spectra[file_path]['nbins'],\
+                                        alpha=0.6, label=f'{os.path.basename(file_path)}', density=True)
                     self.histograms[file_path] = hist[2]
             except FileNotFoundError:
                 Messagebox.show_warning("Warning", f"File {file_path} not found.")
 
             # Update legend with custom colors
             handles, labels = self.ax.get_legend_handles_labels()
-            label_colors = ['red' if self.file_paths[i] == self.current_file\
+            label_colors = ['red' if file_path == self.current_file\
                             else 'black' for i in range(len(labels))]
             self.ax.legend(handles, labels, labelcolor=label_colors)
 
             self.ax.grid(True)
             self.ax.set_xlim(10, None)
-            #self.ax.autoscale()  # Autoscale the axes
+            self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
 
-    def roi_draw(self, density):
-        for i, roi in enumerate(self.roi_limits):
-            hist = np.histogram(io_utils.import_spectrum(self.roi_file[i], treename=self.get_treename(self.roi_file[i])), bins=self.nbins)
-            roi_mask = (hist[1] >= roi[0]) & (hist[1] <= roi[1])
-            roi_binning = hist[1][roi_mask] #Filtered bins content
-            popt = self.roi_popt[i]
-            if self.xscale_unit == 'keV' and self.roi_file[i] in self.calibration_factors:
-                # Need to rescale the ROI limits
-                m, q = self.calibration_factors[self.roi_file[i]]
-                roi = (analysis_utils.adc_to_kev(np.array([roi[0]]), m, q),\
-                       analysis_utils.adc_to_kev(np.array([roi[1]]), m, q))
-                roi_binning = analysis_utils.adc_to_kev(hist[1][roi_mask], m, q)
-                # Rescaling fit parameters
-                # Need to doc how I have derived the parameters
-                popt = [popt[0]/m, popt[1]-(q/m)*popt[0], popt[2]*m, m*(popt[3]+q), popt[4]*m]
-            self.ax.axvline(x=roi[0], linestyle='--', linewidth=1, color='red')
-            self.ax.axvline(x=roi[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
-            if density is False:
-                print(popt)
-                w = np.linspace(min(roi_binning), max(roi_binning), 1000)
-                self.ax.plot(w, analysis_utils.GaussLine(w, popt))
-                x_annotate = roi[0] + (roi[1]-roi[0])*0.5
-                y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max())*0.8
-                self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
-            else:
-                self.ax.plot(roi_binning, (analysis_utils.GaussLine(roi_binning, popt))/(hist[0].sum()*(roi_binning[1]-roi_binning[0])))
-                x_annotate = roi[0] + (roi[1]-roi[0])*0.5
-                y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max()/(hist[0].sum()*(roi_binning[1]-roi_binning[0])))*0.8
-                self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
+    def roi_draw(self):
+        for file_name, file_content in self.opened_spectra.items():
+            # Checking if there are ROIs relative to the spectrum
+            if file_content['rois']['roi_numbers']:
+                # If so, let's plot them
+                hist = file_content['histogram']
+                rois = file_content['rois']
+                for roi, roi_popt, roi_id in zip(rois['roi_limits'], rois['roi_popt'], rois['roi_numbers']):
+                    roi_mask = (hist[1] >= roi[0]) & (hist[1] <= roi[1])
+                    roi_binning = hist[1][roi_mask] #Filtered bins content
+                    if self.xscale_unit == 'keV' and file_content['calibration_factors']:
+                        # Need to rescale the ROI limits
+                        m, q = file_content['calibration_factors']
+                        roi = (analysis_utils.adc_to_kev(np.array([roi[0]]), m, q),\
+                            analysis_utils.adc_to_kev(np.array([roi[1]]), m, q))
+                        roi_binning = analysis_utils.adc_to_kev(hist[1][roi_mask], m, q)
+                        # Rescaling fit parameters
+                        # Need to doc how I have derived the parameters
+                        roi_popt = [roi_popt[0]/m, roi_popt[1]-(q/m)*roi_popt[0], roi_popt[2]*m, m*(roi_popt[3]+q), roi_popt[4]*m]
+                    self.ax.axvline(x=roi[0], linestyle='--', linewidth=1, color='red')
+                    self.ax.axvline(x=roi[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
+                    if self.density is False:
+                        w = np.linspace(min(roi_binning), max(roi_binning), 1000)
+                        self.ax.plot(w, analysis_utils.GaussLine(w, roi_popt))
+                        x_annotate = roi[0] + (roi[1]-roi[0])*0.5
+                        y_annotate = (analysis_utils.GaussLine(roi_binning, roi_popt).max())*0.8
+                        self.ax.annotate(f'{roi_id}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
+                    else:
+                        self.ax.plot(roi_binning, (analysis_utils.GaussLine(roi_binning, roi_popt))/(hist[0].sum()*(roi_binning[1]-roi_binning[0])))
+                        x_annotate = roi[0] + (roi[1]-roi[0])*0.5
+                        y_annotate = (analysis_utils.GaussLine(roi_binning, roi_popt).max()/(hist[0].sum()*(roi_binning[1]-roi_binning[0])))*0.8
+                        self.ax.annotate(f'{roi_id}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
+        # Finally drawing the canva
         self.canvas.draw()
 
     # -------------- BUTTON DEFINITION FUNCTIONS --------------
@@ -271,21 +288,38 @@ class SpectraPlotter(ttk.Window):
                                                filetypes=[("ROOT files", "*.root"),\
                                                           ("CSV files", "*.csv"),\
                                                           ("TXT files", "*.txt")])
-        if file_path:
-            file_name = os.path.basename(file_path)
+        if not file_path:
+            Messagebox.show_error(f"No valid file provided.", "Error")
+        if file_path not in self.opened_spectra.keys() and file_path is not None:
+            # New file, need to create a new dictionary entry
+            self.opened_spectra[file_path] = {
+                'data': io_utils.import_spectrum(file_path, treename=self.get_treename(file_path)),
+                'nbins': self.nbins,
+                'histogram': np.histogram(io_utils.import_spectrum(file_path,\
+                             treename=self.get_treename(file_path)), bins=self.nbins),
+                'rois' : {
+                        'roi_numbers': [],
+                        'roi_limits': [],
+                        'roi_popt': [],
+                        'roi_dpopt': [],
+                },
+                'calibration_points': [],
+                'calibration_factors': []
+            }
+            # Changing the current file to the new one
             self.current_file = file_path
-            self.current_spectrum = np.histogram(io_utils.import_spectrum(file_path, treename=self.get_treename(file_path)), bins=self.nbins)
-            self.file_paths.append(file_path)
+            self.current_spectrum = self.opened_spectra[file_path]['histogram']
+            # Replotting the spectra in the canva with the new file
             self.plot_spectra()
-            if self.roi_limits:
+            if self.current_roi_number:
                     # If ROis are present, let's replot them
-                    self.roi_draw(self.density)
+                    self.roi_draw()
         else:
-            Messagebox.show_error("Error", f"File {file_path} not found.")
+            Messagebox.show_error(f"File already in the canva.", "Error")
 
     # -------------- REBIN SPECTRA BUTTON --------------
     def rebin_spectra(self):
-        if not self.file_paths:
+        if not self.opened_spectra.keys():
             Messagebox.show_warning("No files to rebin.", "Warning")
             return
 
@@ -295,28 +329,49 @@ class SpectraPlotter(ttk.Window):
         rebin_window.geometry("300x250")
 
         ttk.Label(rebin_window, text="Select File:").pack(pady=10)
-        file_var = ttk.StringVar(rebin_window)
-        file_menu = ttk.Combobox(rebin_window, textvariable=file_var, values=self.file_paths)
+        file_var = ttk.StringVar(value=self.current_file if self.opened_spectra.keys() else "")
+        file_menu = ttk.Combobox(rebin_window, textvariable=file_var,\
+                                 values=list(self.opened_spectra.keys()))
         file_menu.pack(pady=10)
 
         ttk.Label(rebin_window, text="Select Number of Bins:").pack(pady=10)
-        bins_var = ttk.IntVar(rebin_window)
+        file_var.get()
+        bins_var = ttk.IntVar(value=self.opened_spectra[file_var.get()]['nbins'])
         bins_menu = ttk.Combobox(rebin_window, textvariable=bins_var,\
-                                values=[128, 256, 512, 1024, 2048, 4096])
+                                 values=[128, 256, 512, 1024, 2048, 4096])
         bins_menu.pack(pady=10)
 
         def apply_rebin():
             selected_file = file_var.get()
             new_bins = bins_var.get()
             if selected_file and new_bins:
-                self.nbins = new_bins
+                # Changing the binning to the selected file...
+                self.opened_spectra[selected_file]['nbins'] = new_bins
+                # ... re-creating the histogram with the new binning
+                self.opened_spectra[selected_file]['histogram'] = \
+                    np.histogram(self.opened_spectra[selected_file]['data'],\
+                                 bins=new_bins)
+                # If the re-binned histogram is the current one, updating it
+                if selected_file == self.current_file:
+                    self.current_spectrum = self.opened_spectra[selected_file]['histogram']
                 # Remove the old histogram
-                if selected_file in self.histograms:
+                if selected_file in self.histograms.keys():
                     for patch in self.histograms[selected_file]:
                         patch.remove()
                     del self.histograms[selected_file]
                 # Plot the new histogram
                 self.plot_spectra(file_path=selected_file)
+                # eventually, if ROIs are associated to the spectrum, re-computing the fit params
+                # and replotting on the new histogram
+                if self.opened_spectra[selected_file]['rois']:
+                    rois = self.opened_spectra[selected_file]['rois']
+                    for roi in rois['roi_limits']:
+                        for line in self.ax.lines:
+                            if (line.get_linestyle() == '--' and line.get_xdata()[0] in roi)\
+                                or (line.get_xdata()[0] >= roi[0] and line.get_xdata()[0] <= roi[1]):
+                                line.remove()
+                        # Re-fitting the ROIs without incrementing the ROI number
+                        self.onselect(roi[0], roi[1], increase=False)
                 rebin_window.destroy()
             else:
                 Messagebox.show_warning("Please select a file and number of bins.", "Warning")
@@ -327,29 +382,29 @@ class SpectraPlotter(ttk.Window):
 
     # -------------- NORMALIZE SPECTRA BUTTON --------------
     def normalize_spectra(self):
-        if not self.file_paths:
+        if not self.opened_spectra.keys():
             Messagebox.show_warning("No histogram to normalize.", "Warning")
             return
         if self.density is False:
             self.density = True
             self.plot_spectra()
             # If some ROIs are already defined, replot them
-            if self.roi_limits:
-                self.roi_draw(self.density)
-                self.canvas.draw()
+            if self.current_roi_number is not None:
+                # In this case, at least a ROI does exists
+                self.roi_draw()
             return
         else:
             self.density = False
             self.plot_spectra()
             # If some ROIs are already defined, replot them
-            if self.roi_limits:
-                self.roi_draw(self.density)
+            if self.current_roi_number is not None:
+                self.roi_draw()
             return
 
     # -------------- SELECT SPECTRUM BUTTON --------------
     def select_spectrum(self):
-        if not self.file_paths:
-            Messagebox.show_warning("No files to rebin.", "Warning")
+        if not self.opened_spectra.keys():
+            Messagebox.show_warning("No files to select.", "Warning")
             return
         # Create a new window for rebinning
         select_window = ttk.Toplevel(self)
@@ -359,7 +414,7 @@ class SpectraPlotter(ttk.Window):
         ttk.Label(select_window, text="Select File:").pack(pady=10)
         file_select = ttk.StringVar(select_window)
         file_menu_select = ttk.Combobox(select_window, textvariable=file_select,\
-                                        values=self.file_paths)
+                                        values=list(self.opened_spectra.keys()))
         file_menu_select.pack(pady=10)
 
         def apply_selection():
@@ -369,8 +424,8 @@ class SpectraPlotter(ttk.Window):
                 self.current_spectrum = np.histogram(io_utils.import_spectrum(selected_file, treename=self.get_treename(selected_file)), bins=self.nbins)
                 self.plot_spectra()
                 # If some ROIs are already defined, replot them
-                if self.roi_limits:
-                    self.roi_draw(self.density)
+                if self.current_roi_number:
+                    self.roi_draw()
                 select_window.destroy()
             else:
                 Messagebox.show_warning("Please select a file.", "Warning")
@@ -380,8 +435,8 @@ class SpectraPlotter(ttk.Window):
 
     # -------------- DELETE FILE BUTTON --------------
     def delete_file(self):
-        if not self.file_paths:
-            Messagebox.show_warning("No file selected.", "Warning")
+        if not self.opened_spectra.keys():
+            Messagebox.show_warning("No opened file.", "Warning")
             return
         # Create a new window for rebinning
         delete_window = ttk.Toplevel(self)
@@ -391,18 +446,23 @@ class SpectraPlotter(ttk.Window):
         ttk.Label(delete_window, text="Select File:").pack(pady=10)
         file_delete = ttk.StringVar(delete_window)
         file_menu_delete = ttk.Combobox(delete_window, textvariable=file_delete,\
-                                        values=self.file_paths)
+                                        values=list(self.opened_spectra.keys()))
         file_menu_delete.pack(pady=10)
 
         def apply_deletion():
             selected_file = file_delete.get()
             if selected_file:
-                self.file_paths.remove(selected_file)
+                # Removing the selected file from the opened_spectra dictionary
+                del self.opened_spectra[selected_file]
                 if selected_file in self.histograms:
+                    # Cancelling the histogram from the canva
                     for patch in self.histograms[selected_file]:
                         patch.remove()
                     del self.histograms[selected_file]
                 self.plot_spectra()
+                if self.current_roi_number:
+                    # If ROIs are present
+                    self.roi_draw()
                 delete_window.destroy()
             else:
                 Messagebox.show_warning("Please select a file.", "Warning")
@@ -411,37 +471,65 @@ class SpectraPlotter(ttk.Window):
         apply_button.pack(pady=10)
 
     # -------------- INTERVAL SELECTION BUTTON --------------
-    def onselect(self, xmin, xmax):
+    def onselect(self, xmin, xmax, increase: bool = True):
         """Callback function to handle the selection of an interval."""
         # Adding the Tuple containing the ROI limits to the dedicated class attribute
         new_roi = (xmin, xmax)
-        self.roi_limits.append(new_roi)
-        # Creating the ROI mask for further use
-        roi_mask = (self.current_spectrum[1] >= xmin) & (self.current_spectrum[1] <= xmax)
-        roi_mask_tmp = roi_mask[:-1]
-        # Defining the roi_binning
-        roi_binning = self.current_spectrum[1][roi_mask]
-        popt, dpopt = analysis_utils.onselect(self.current_spectrum, xmin, xmax,\
-                                              density=self.density)
-        # Saving fit results
-        self.roi_popt.append(popt)
-        self.roi_dpopt.append(dpopt)
-        self.roi_file.append(self.current_file)
+        # Selecting the rois dictionary for the current file
+        hist = self.opened_spectra[self.current_file]['histogram']
+        rois = self.opened_spectra[self.current_file]['rois']
+        # Appending the new ROI to the list of ROIs corresponding to the file
+        if new_roi in rois['roi_limits']:
+            # Searching for roi index in order to update the fit results
+            roi_index = rois['roi_limits'].index(new_roi)
+            # Creating the ROI mask for further use
+            roi_mask = (hist[1] >= xmin) & (hist[1] <= xmax)
+            # Defining the roi_binning
+            roi_binning = hist[1][roi_mask]
+            popt, dpopt = analysis_utils.onselect(hist, xmin, xmax,\
+                                                density=self.density)
+            # Saving 'new' fit results
+            rois['roi_popt'][roi_index] = popt
+            rois['roi_dpopt'][roi_index] = dpopt
+        else:
+            # New ROI, need to be fitted and then appended to the list
+            rois['roi_limits'].append(new_roi)
+            # Creating the ROI mask for further use
+            roi_mask = (hist[1] >= xmin) & (hist[1] <= xmax)
+            # Defining the roi_binning
+            roi_binning = hist[1][roi_mask]
+            popt, dpopt = analysis_utils.onselect(hist, xmin, xmax,\
+                                                density=self.density)
+            # Saving fit results
+            rois['roi_popt'].append(popt)
+            rois['roi_dpopt'].append(dpopt)
+        if increase:
+            if self.current_roi_number is None:
+                # First roi in the canva
+                self.current_roi_number = 0
+            rois['roi_numbers'].append(self.current_roi_number)
+            # Incrementing the global ROI number
         # Tracing the vertical lines defining the ROI
         self.ax.axvline(x=xmin, linestyle='--', linewidth=1, color='red')
         self.ax.axvline(x=xmax, color=plt.gca().lines[-1].get_color(),\
                         linestyle='--', linewidth=1)
         x_annotate = xmin + (xmax-xmin)*0.5
-        y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max())*0.8
-        self.ax.annotate(f'{self.roi_limits.index(new_roi)}', xy=(xmin, 0),\
-                         xytext=(x_annotate, y_annotate),  fontsize=12)
+        if self.density is False:
+            y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max())*0.8
+            print(y_annotate)
+        else:
+            y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max()/(hist[0].sum()*(roi_binning[1]-roi_binning[0])))*0.8
+        if increase:
+            self.ax.annotate(f'{self.current_roi_number}', xy=(xmin, 0),\
+                        xytext=(x_annotate, y_annotate),  fontsize=12)
+            self.current_roi_number += 1
 
         # Plotting the fit results on spectrum
         w = np.linspace(min(roi_binning), max(roi_binning), 1000)
         if self.density is False:
             self.ax.plot(w, analysis_utils.GaussLine(w, popt))
         else:
-            self.ax.plot(w, (analysis_utils.GaussLine(w, popt))/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))
+            self.ax.plot(w, (analysis_utils.GaussLine(w, popt))/(hist[0].sum()*(roi_binning[1]-roi_binning[0])))
 
         self.canvas.draw()
 
@@ -473,7 +561,7 @@ class SpectraPlotter(ttk.Window):
 
     # -------------- DELETE ROI BUTTON --------------
     def delete_roi(self):
-        if not self.roi_limits:
+        if not self.current_roi_number:
             Messagebox.show_warning("No ROI to delete.", "Warning")
             return
         # Create a new window for ROI selection
@@ -484,17 +572,20 @@ class SpectraPlotter(ttk.Window):
         ttk.Label(delete_roi_window, text="Select ROI:").pack(pady=10)
         roi_delete = ttk.StringVar(delete_roi_window)
         roi_menu_delete = ttk.Combobox(delete_roi_window, textvariable=roi_delete,\
-                                        values=[str(i) for i in range(len(self.roi_limits))] + ['All'])
+                                        values=[str(i) for i in range(self.current_roi_number)] + ['All'])
         roi_menu_delete.pack(pady=10)
 
         def apply_roideletion():
             selected_roi = roi_delete.get()
             if selected_roi:
                 if selected_roi == 'All':
-                    self.roi_limits = [] # re-initializing the ROI list
-                    self.roi_popt = [] # re-initializing the ROI fit results list
-                    self.roi_dpopt = [] # re-initializing the ROI fit errors list
-                    self.roi_file = [] # re-initializing the ROI file list
+                    for spectrum in self.opened_spectra.values():
+                        spectrum['rois'] = {
+                            'roi_numbers': [],
+                            'roi_limits': [],
+                            'roi_popt': [],
+                            'roi_dpopt': []
+                        }
                     # Removing all ROI lines from the plot
                     for line in self.ax.lines[:]:
                         line.remove()
@@ -502,33 +593,48 @@ class SpectraPlotter(ttk.Window):
                     for annotation in self.ax.texts:
                         annotation.remove()
                     self.canvas.draw()
-                    delete_roi_window.destroy()
                 else:
                     selected_roi = int(selected_roi)
-                    roi_limits = self.roi_limits[selected_roi]
-                    # Removing the ROI from the list of ROIs
-                    self.roi_popt.pop(selected_roi)
-                    self.roi_limits.remove(roi_limits)
-                    self.roi_dpopt.pop(selected_roi)
-                    self.roi_file.pop(selected_roi)
-                    # Removing the ROI lines from the plot
+                    # Removing the corresponding annotations
+                    for annotation in self.ax.texts:
+                        annotation.remove()
+                    for spectrum in self.opened_spectra.values():
+                        # Search for the ROI to delete
+                        rois = spectrum['rois']
+                        if selected_roi in rois['roi_numbers']:
+                            roi_limits = rois['roi_limits'][rois['roi_numbers'].index(selected_roi)]
+                            roi_index = rois['roi_numbers'].index(selected_roi)
+                            roi_limits = rois['roi_limits'].pop(roi_index)
+                            roi_popt = rois['roi_popt'].pop(roi_index)
+                            roi_dpopt = rois['roi_dpopt'].pop(roi_index)
+                            rois['roi_numbers'].remove(selected_roi)
+                        # Update the indices of the remaining ROIs and their annotations
+                        for roi_id, roi_lims, roi_popt in zip(rois['roi_numbers'], rois['roi_limits'], rois['roi_popt']):
+                            roi_mask = (spectrum['histogram'][1] >= roi_lims[0])\
+                                     & (spectrum['histogram'][1] <= roi_lims[1])
+                            roi_binning = spectrum['histogram'][1][roi_mask]
+                            x_annotate = roi_lims[0] + (roi_lims[1]-roi_lims[0])*0.5
+                            y_annotate = (analysis_utils.GaussLine(roi_binning,\
+                            roi_popt).max()/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))*0.8
+                            if roi_id < selected_roi:
+                                # Nothing changes
+                                self.ax.annotate(f'{roi_id}', xy=(roi_lims[0], 0),\
+                                xytext=(x_annotate, y_annotate), fontsize=12)
+                            else:
+                                # Decrementing the ROI number
+                                index = rois['roi_numbers'].index(roi_id)
+                                rois['roi_numbers'][index] -= 1
+                                # Updating the annotation
+                                self.ax.annotate(f'{roi_id - 1}', xy=(roi_lims[0], 0),\
+                                xytext=(x_annotate, y_annotate), fontsize=12)
+
+                    # Removing the ROI lines for the selected ROI from the plot
                     for line in self.ax.lines:
                         if (line.get_linestyle() == '--' and line.get_xdata()[0] in roi_limits)\
                             or (line.get_xdata()[0] >= roi_limits[0] and line.get_xdata()[0] <= roi_limits[1]):
                             line.remove()
-                    # Removing the corresponding annotations
-                    for annotation in self.ax.texts:
-                        annotation.remove()
-                    # Update the indices of the remaining ROIs and their annotations
-                    for i, roi, popt in enumerate(zip(self.roi_limits, self.roi_popt)):
-                        roi_mask = (self.current_spectrum[1] >= roi[0]) & (self.current_spectrum[1] <= roi[1])
-                        roi_binning = self.current_spectrum[1][roi_mask]
-                        x_annotate = roi[0] + (roi[1]-roi[0])*0.5
-                        y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max()/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))*0.8
-                        self.ax.annotate(f'{i}', xy=(roi[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
-
+                    # Plotting the canva
                     self.canvas.draw()
-                    delete_roi_window.destroy()
             else:
                 Messagebox.show_warning("Please select a ROI.", "Warning")
 
@@ -537,7 +643,7 @@ class SpectraPlotter(ttk.Window):
 
     # -------------- SAVE RESULTS BUTTON --------------
     def save_results(self):
-        if not self.roi_limits:
+        if self.current_roi_number is None:
             Messagebox.show_warning("No ROI to save", "Warning")
             return
         else:
@@ -560,11 +666,20 @@ class SpectraPlotter(ttk.Window):
             # Scrivi i risultati nel file
             with open(file_path, 'w') as file:
                 # Writing header
-                file.write(f'# Source file: {self.current_file}\n')
+                file.write(f'# Source file(s): {self.opened_spectra.keys()}\n')
                 file.write(f'# Date of creation of this .txt file: {date_string}\n')
                 file.write('# ROI ID    xmin    xmax    mu  dmu sigma   dsigma     res FWHM\n')
-                for i, (roi, fitresults, dfitresults) in enumerate(zip(self.roi_limits, self.roi_popt, self.roi_dpopt)):
-                    file.write(f'{i}    {roi[0]}    {roi[1]}    {fitresults[3]}    {dfitresults[3]}    {fitresults[4]}    {dfitresults[4]}     {(fitresults[4]/fitresults[3])*2.355}\n')
+                for spectra in self.opened_spectra.values():
+                    for roi_id in spectra['rois']['roi_numbers']:
+                        # Selecting roi limits and fit results
+                        index = spectra['rois']['roi_numbers'].index(roi_id)
+                        roi_lims = spectra['rois']['roi_limits'][index]
+                        fitresults = spectra['rois']['roi_popt'][index]
+                        dfitresults = spectra['rois']['roi_dpopt'][index]
+                        file.write(f'{roi_id}    {roi_lims[0]}    {roi_lims[1]}\
+                                    {fitresults[3]}    {dfitresults[3]}\
+                                    {fitresults[4]}    {dfitresults[4]}\
+                                    {(fitresults[4]/fitresults[3])*2.355}\n')
             Messagebox.ok(f"{file_path} file created", "Save ROI(s) fit results")
 
     def ask_file_name(self):
@@ -594,8 +709,8 @@ class SpectraPlotter(ttk.Window):
 
         # Menu a tendina per selezionare il nome del file dello spettro da calibrare
         ttk.Label(dialog, text="Select Spectrum:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        spectrum_file = ttk.StringVar(value=self.current_file if self.file_paths else "")
-        spectrum_menu = ttk.Combobox(dialog, textvariable=spectrum_file, values=self.file_paths)
+        spectrum_file = ttk.StringVar(value=self.current_file if self.opened_spectra.keys() else "")
+        spectrum_menu = ttk.Combobox(dialog, textvariable=spectrum_file, values=list(self.opened_spectra.keys()))
         spectrum_menu.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
 
         tree = ttk.Treeview(dialog, columns=("Bin", "Energy"), show="headings", bootstyle='info')
@@ -603,8 +718,9 @@ class SpectraPlotter(ttk.Window):
         tree.heading("Energy", text="Energy [keV]")
         # Need an if that looks if there are no rows []
         tree.insert("", "end", values=(0, 0), tags=("row",))
-        if self.calibration_points.get(spectrum_file.get()):
-            for bin_number, energy in self.calibration_points[self.current_file]:
+        if self.opened_spectra.get(spectrum_file.get())['calibration_points']:
+            calibration_points = self.opened_spectra.get(spectrum_file.get())['calibration_points']
+            for bin_number, energy in calibration_points:
                 tree.insert("", "end", values=(bin_number, energy), tags=("row",))
         tree.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
 
@@ -612,17 +728,33 @@ class SpectraPlotter(ttk.Window):
         style = ttk.Style()
         style.configure("Treeview", rowheight=30)
 
-        # Menu a tendina per selezionare l'ID del ROI
+        # ROI ID selection window
         ttk.Label(dialog, text="ROI ID:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
         roi_id = ttk.StringVar()
-        roi_menu = ttk.Combobox(dialog, textvariable=roi_id, values=[str(i) for i in range(len(self.roi_limits))])
+        roi_menu = ttk.Combobox(dialog, textvariable=roi_id)
         roi_menu.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
 
+        def update_roi_menu(*args):
+            selected_file = spectrum_file.get()
+            if selected_file in self.opened_spectra:
+                current_rois = self.opened_spectra[selected_file]['rois']['roi_numbers']
+                roi_menu['values'] = [str(i) for i in current_rois]
+            else:
+                roi_menu['values'] = []
+
+        spectrum_file.trace_add('write', update_roi_menu)
+        update_roi_menu()
+
         def apply_roi():
+            selected_file = spectrum_file.get()
             selected_roi = int(roi_id.get())
             if selected_roi is not None:
+                current_spectrum = self.opened_spectra.get(selected_file)
+                rois = current_spectrum['rois']
+                index = rois['roi_numbers'].index(selected_roi)
+                popt = current_spectrum['rois']['roi_popt'][index]
                 # We want to use the ROI centroid as the energy value
-                tree.insert("", "end", values=(f"{self.roi_popt[selected_roi][3]}", ""), tags=("row",))
+                tree.insert("", "end", values=(f"{popt[3]}", ""), tags=("row",))
             else:
                 Messagebox.show_warning("Please select a ROI ID.", "Warning")
 
@@ -636,21 +768,21 @@ class SpectraPlotter(ttk.Window):
             if selected_item:
                 tree.delete(selected_item)
 
-
         def on_calibrate():
             selected_file = spectrum_file.get()
+            spectrum = self.opened_spectra.get(selected_file)
             if not selected_file:
                 Messagebox.show_warning("Please select a spectrum file", "Warning")
                 return
-            calibration_points = [] #List filled with tuples (bin_number, energy)
             for row in tree.get_children():
                 bin_number, energy = tree.item(row)["values"]
                 if self.is_float(bin_number) and self.is_float(energy):
-                    calibration_points.append((float(bin_number), float(energy)))
+                    spectrum['calibration_points'].append((float(bin_number), float(energy))) #List filled with tuples (bin_number, energy)
+                    print(((float(bin_number), float(energy))))
                 else:
                     Messagebox.show_warning("Please enter valid numbers for bin and energy", "Warning")
                     return
-            self.save_calibration(selected_file, calibration_points)
+            self.apply_calibration(selected_file, spectrum['calibration_points'])
         def on_double_click(event):
             item = tree.selection()[0]
             column = tree.identify_column(event.x)
@@ -695,13 +827,13 @@ class SpectraPlotter(ttk.Window):
         except ValueError:
             return False
 
-    def save_calibration(self, selected_file, calibration_points):
+    def apply_calibration(self, selected_file, calibration_points):
         """Apply the calibration to the spectrum."""
         # Fitting a line to calibration points
         m, q = analysis_utils.calibration_fit(calibration_points)
-        # Save the result into the calibration_points dictionary
-        self.calibration_points[selected_file] = calibration_points
-        self.calibration_factors[selected_file] = (m, q)
+        # Save the result into the calibration_factors dictionary
+        spectrum = self.opened_spectra[selected_file]
+        spectrum['calibration_factors'] = (m, q)
 
     # -------------- CONVERT UNITS BUTTON --------------
 
@@ -710,35 +842,27 @@ class SpectraPlotter(ttk.Window):
         if self.xscale_unit == 'ADC':
             self.xscale_unit = 'keV'
             self.plot_spectra()
-            if self.roi_limits:
-                self.roi_draw(self.density)
+            if self.current_roi_number:
+                self.roi_draw()
         elif self.xscale_unit == 'keV':
             self.xscale_unit = 'ADC'
             self.plot_spectra()
-            if self.roi_limits:
-                self.roi_draw(self.density)
+            if self.current_roi_number:
+                self.roi_draw()
     
     # -------------- CLEAR ALL BUTTON --------------
     def clear_all(self):
-        if not self.file_paths:
+        if not self.opened_spectra.keys():
             Messagebox.show_warning("No files to clear", "Warning")
             return
-        # Clear all histograms from the plot
-        for file in self.file_paths:
-            if file in self.histograms:
-                for patch in self.histograms[file]:
-                    patch.remove()
-                del self.histograms[file]
-        self.file_paths = []
-        self.current_file = None
-        self.current_spectrum = None
-        self.roi_limits = []
-        self.roi_popt = []
-        self.roi_dpopt = []
-        self.roi_file = []
+        # Clearing the filled class instance attributes
+        self.nbins = 1024
+        self.opened_spectra = {}
+        self.density = False
         self.xscale_unit = 'ADC' # Default unit is ADC when canva is created
-        self.calibration_points = {}
-        self.calibration_factors = {}
+        self.current_roi_number = None # Counter for the ROIs
+        # Line to follow the cursor
+        self.cursor_line = None
         self.ax.clear()
         self.canvas.draw()
 
