@@ -389,16 +389,15 @@ class SpectraPlotter(ttk.Window):
             self.density = True
             self.plot_spectra()
             # If some ROIs are already defined, replot them
-            if self.current_roi_number:
+            if self.current_roi_number is not None:
                 # In this case, at least a ROI does exists
                 self.roi_draw()
-                self.canvas.draw()
             return
         else:
             self.density = False
             self.plot_spectra()
             # If some ROIs are already defined, replot them
-            if self.current_roi_number:
+            if self.current_roi_number is not None:
                 self.roi_draw()
             return
 
@@ -477,16 +476,17 @@ class SpectraPlotter(ttk.Window):
         # Adding the Tuple containing the ROI limits to the dedicated class attribute
         new_roi = (xmin, xmax)
         # Selecting the rois dictionary for the current file
+        hist = self.opened_spectra[self.current_file]['histogram']
         rois = self.opened_spectra[self.current_file]['rois']
         # Appending the new ROI to the list of ROIs corresponding to the file
         if new_roi in rois['roi_limits']:
             # Searching for roi index in order to update the fit results
             roi_index = rois['roi_limits'].index(new_roi)
             # Creating the ROI mask for further use
-            roi_mask = (self.current_spectrum[1] >= xmin) & (self.current_spectrum[1] <= xmax)
+            roi_mask = (hist[1] >= xmin) & (hist[1] <= xmax)
             # Defining the roi_binning
-            roi_binning = self.current_spectrum[1][roi_mask]
-            popt, dpopt = analysis_utils.onselect(self.current_spectrum, xmin, xmax,\
+            roi_binning = hist[1][roi_mask]
+            popt, dpopt = analysis_utils.onselect(hist, xmin, xmax,\
                                                 density=self.density)
             # Saving 'new' fit results
             rois['roi_popt'][roi_index] = popt
@@ -495,16 +495,16 @@ class SpectraPlotter(ttk.Window):
             # New ROI, need to be fitted and then appended to the list
             rois['roi_limits'].append(new_roi)
             # Creating the ROI mask for further use
-            roi_mask = (self.current_spectrum[1] >= xmin) & (self.current_spectrum[1] <= xmax)
+            roi_mask = (hist[1] >= xmin) & (hist[1] <= xmax)
             # Defining the roi_binning
-            roi_binning = self.current_spectrum[1][roi_mask]
-            popt, dpopt = analysis_utils.onselect(self.current_spectrum, xmin, xmax,\
+            roi_binning = hist[1][roi_mask]
+            popt, dpopt = analysis_utils.onselect(hist, xmin, xmax,\
                                                 density=self.density)
             # Saving fit results
             rois['roi_popt'].append(popt)
             rois['roi_dpopt'].append(dpopt)
         if increase:
-            if not self.current_roi_number:
+            if self.current_roi_number is None:
                 # First roi in the canva
                 self.current_roi_number = 0
             rois['roi_numbers'].append(self.current_roi_number)
@@ -514,10 +514,14 @@ class SpectraPlotter(ttk.Window):
         self.ax.axvline(x=xmax, color=plt.gca().lines[-1].get_color(),\
                         linestyle='--', linewidth=1)
         x_annotate = xmin + (xmax-xmin)*0.5
-        y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max())*0.8
+        if self.density is False:
+            y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max())*0.8
+            print(y_annotate)
+        else:
+            y_annotate = (analysis_utils.GaussLine(roi_binning, popt).max()/(hist[0].sum()*(roi_binning[1]-roi_binning[0])))*0.8
         if increase:
             self.ax.annotate(f'{self.current_roi_number}', xy=(xmin, 0),\
-                         xytext=(x_annotate, y_annotate),  fontsize=12)
+                        xytext=(x_annotate, y_annotate),  fontsize=12)
             self.current_roi_number += 1
 
         # Plotting the fit results on spectrum
@@ -525,7 +529,7 @@ class SpectraPlotter(ttk.Window):
         if self.density is False:
             self.ax.plot(w, analysis_utils.GaussLine(w, popt))
         else:
-            self.ax.plot(w, (analysis_utils.GaussLine(w, popt))/(self.current_spectrum[0].sum()*(roi_binning[1]-roi_binning[0])))
+            self.ax.plot(w, (analysis_utils.GaussLine(w, popt))/(hist[0].sum()*(roi_binning[1]-roi_binning[0])))
 
         self.canvas.draw()
 
@@ -726,16 +730,28 @@ class SpectraPlotter(ttk.Window):
         # ROI ID selection window
         ttk.Label(dialog, text="ROI ID:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
         roi_id = ttk.StringVar()
-        current_rois = self.opened_spectra.get(spectrum_file.get())['rois']['roi_numbers']
-        roi_menu = ttk.Combobox(dialog, textvariable=roi_id, values=[str(i) for i in current_rois])
+        roi_menu = ttk.Combobox(dialog, textvariable=roi_id)
         roi_menu.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
+
+        def update_roi_menu(*args):
+            selected_file = spectrum_file.get()
+            if selected_file in self.opened_spectra:
+                current_rois = self.opened_spectra[selected_file]['rois']['roi_numbers']
+                roi_menu['values'] = [str(i) for i in current_rois]
+            else:
+                roi_menu['values'] = []
+
+        spectrum_file.trace_add('write', update_roi_menu)
+        update_roi_menu()
 
         def apply_roi():
             selected_file = spectrum_file.get()
             selected_roi = int(roi_id.get())
             if selected_roi is not None:
                 current_spectrum = self.opened_spectra.get(selected_file)
-                popt = current_spectrum['rois']['roi_popt'].index(selected_roi)
+                rois = current_spectrum['rois']
+                index = rois['roi_numbers'].index(selected_roi)
+                popt = current_spectrum['rois']['roi_popt'][index]
                 # We want to use the ROI centroid as the energy value
                 tree.insert("", "end", values=(f"{popt[3]}", ""), tags=("row",))
             else:
@@ -757,15 +773,15 @@ class SpectraPlotter(ttk.Window):
             if not selected_file:
                 Messagebox.show_warning("Please select a spectrum file", "Warning")
                 return
-            calibration_points = [] #List filled with tuples (bin_number, energy)
             for row in tree.get_children():
                 bin_number, energy = tree.item(row)["values"]
                 if self.is_float(bin_number) and self.is_float(energy):
-                    spectrum['calibration_points'].append((float(bin_number), float(energy)))
+                    spectrum['calibration_points'].append((float(bin_number), float(energy))) #List filled with tuples (bin_number, energy)
+                    print(((float(bin_number), float(energy))))
                 else:
                     Messagebox.show_warning("Please enter valid numbers for bin and energy", "Warning")
                     return
-            self.apply_calibration(selected_file, calibration_points)
+            self.apply_calibration(selected_file, spectrum['calibration_points'])
         def on_double_click(event):
             item = tree.selection()[0]
             column = tree.identify_column(event.x)
