@@ -79,10 +79,8 @@ def roi_fit(spectrum: np.array, roi_min: float, roi_max: float, density: bool=Fa
     # Creating a ROOT RDataFrame from the numpy arrays
     # Creation of the TGraph
     graph = root.TGraph(len(roi_bins), roi_bins, roi_content)
-    print('Debug print. TGraph created.')
     # Defining the ROOT model (Gaussian + Linear background)
     gaussline = root.TF1("gaussline", "[0]*x + [1] + [2]/[4]*exp(-(x-[3])**2/(2.*[4]**2))", roi_bins[0], roi_bins[-1])
-    print('Debug print, TF1 created.')
     # Computing the initial parameters and setting them to the model
     init = init_computation(roi_content, roi_bins)
     gaussline.SetParameters(*init)
