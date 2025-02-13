@@ -57,8 +57,6 @@ class SpectraPlotter(ttk.Window):
         self.density = False
         self.xscale_unit = 'ADC' # Default unit is ADC when canva is created
         self.current_roi_number = None # Counter for the ROIs
-        self.calibration_points = {}
-        self.calibration_factors = {}
         # Line to follow the cursor
         self.cursor_line = None
         # Saving possible additional arguments
@@ -223,7 +221,7 @@ class SpectraPlotter(ttk.Window):
                 if file_path in self.histograms:
                     for patch in self.histograms[file_path]:
                         patch.remove()
-                    #del self.histograms[file_path]
+                    del self.histograms[file_path]
                 spectrum = self.opened_spectra[file_path]['data']
                 if self.density is False:
                     hist = self.ax.hist(spectrum, bins=nbins, alpha=0.6,\
@@ -819,8 +817,18 @@ class SpectraPlotter(ttk.Window):
         if not self.opened_spectra.keys():
             Messagebox.show_warning("No files to clear", "Warning")
             return
-        # Re-initialize the class instance
-        self.__init__(file_paths=None, nbins=1024)
+        self.nbins = 1024
+        self.opened_spectra = {
+        }
+        # Creating dictionaries containing calibration points and factors for each file
+        # Flag that indicates the x scale 
+        self.density = False
+        self.xscale_unit = 'ADC' # Default unit is ADC when canva is created
+        self.current_roi_number = None # Counter for the ROIs
+        # Line to follow the cursor
+        self.cursor_line = None
+        self.ax.clear()
+        self.canvas.draw()
 
     # -------------- CLOSING PROTOCOL --------------
     def on_closing(self):
