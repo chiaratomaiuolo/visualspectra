@@ -643,7 +643,7 @@ class SpectraPlotter(ttk.Window):
 
     # -------------- SAVE RESULTS BUTTON --------------
     def save_results(self):
-        if not self.roi_limits:
+        if self.current_roi_number is None:
             Messagebox.show_warning("No ROI to save", "Warning")
             return
         else:
@@ -672,9 +672,10 @@ class SpectraPlotter(ttk.Window):
                 for spectra in self.opened_spectra.values():
                     for roi_id in spectra['rois']['roi_numbers']:
                         # Selecting roi limits and fit results
-                        roi_lims = spectra['rois']['roi_limits'].index(roi_id)
-                        fitresults = spectra['rois']['roi_popt'].index(roi_id)
-                        dfitresults = spectra['rois']['roi_dpopt'].index(roi_id)
+                        index = spectra['rois']['roi_numbers'].index(roi_id)
+                        roi_lims = spectra['rois']['roi_limits'][index]
+                        fitresults = spectra['rois']['roi_popt'][index]
+                        dfitresults = spectra['rois']['roi_dpopt'][index]
                         file.write(f'{roi_id}    {roi_lims[0]}    {roi_lims[1]}\
                                     {fitresults[3]}    {dfitresults[3]}\
                                     {fitresults[4]}    {dfitresults[4]}\
