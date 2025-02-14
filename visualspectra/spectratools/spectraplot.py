@@ -728,10 +728,20 @@ class SpectraPlotter(ttk.Window):
         def update_roi_menu(*args):
             selected_file = spectrum_file.get()
             if selected_file in self.opened_spectra:
-                roi_ids = [roi.id for roi in self.opened_spectra[selected_file]['rois']]
-                roi_menu['values'] = [str(i) for i in roi_ids]
+                current_rois = self.opened_spectra[selected_file]['rois']
+                roi_menu['values'] = [str(roi.id) for roi in current_rois]
+                # Clear the treeview
+                for row in tree.get_children():
+                    tree.delete(row)
+                # Insert calibration points for the selected file
+                calibration_points = self.opened_spectra[selected_file]['calibration_points']
+                for bin_number, energy in calibration_points:
+                    tree.insert("", "end", values=(bin_number, energy), tags=("row",))
             else:
                 roi_menu['values'] = []
+                # Clear the treeview
+                for row in tree.get_children():
+                    tree.delete(row)
 
         spectrum_file.trace_add('write', update_roi_menu)
         update_roi_menu()
