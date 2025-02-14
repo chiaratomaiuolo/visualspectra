@@ -13,6 +13,37 @@ from uncertainties import ufloat
 # ... and eventually local modules
 import spectratools.spectraio as io_utils
 
+class Roi():
+    """ Class containing all the interestig characteristics of a ROI.
+    """
+    def __init__(self, roi_limits: Tuple[float, float]):
+        self.limits = roi_limits
+
+        @property
+        def limits(self):
+            return self._limits
+        @limits.setter
+        def limits(self, limits):
+            self._limits = limits
+        @property
+        def id(self):
+            return self._id
+        @id.setter
+        def id(self, id):
+            self._id = id
+        @property
+        def roi_popt(self):
+            return self._roi_popt
+        @roi_popt.setter
+        def roi_popt(self, roi_popt):
+            self._roi_popt = roi_popt
+        @property
+        def roi_dpopt(self):
+            return self._roi_dpopt
+        @roi_dpopt.setter
+        def roi_dpopt(self, roi_dpopt):
+            self._roi_dpopt = roi_dpopt
+
 # ---------------------- Fit functions ----------------------
 def line(x: np.ndarray, pars: np.ndarray) -> float:
     """ Linear function in ROOT-like format.
