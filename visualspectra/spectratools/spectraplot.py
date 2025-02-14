@@ -570,6 +570,11 @@ class SpectraPlotter(ttk.Window):
                                         values=[str(i) for i in range(self.current_roi_number)] + ['All'])
         roi_menu_delete.pack(pady=10)
 
+        def update_roi_menu_delete():
+            roi_menu_delete['values'] = [str(roi.id) for roi in self.opened_spectra[self.current_file]['rois']] + ['All']
+
+        update_roi_menu_delete()
+
         def apply_roideletion():
             selected_roi = roi_delete.get()
             if selected_roi:
@@ -621,11 +626,14 @@ class SpectraPlotter(ttk.Window):
                             else:
                                 # Decrementing the ROI number
                                 roi.id = roi.id - 1
+                                # Decrementing the total number of ROIs
+                                self.current_roi_number -= 1
                                 # Updating the annotation
                                 self.ax.annotate(f'{roi.id}', xy=(roi.limits[0], 0),\
                                 xytext=(x_annotate, y_annotate), fontsize=12)
                     # Plotting the canva
                     self.canvas.draw()
+                update_roi_menu_delete()
             else:
                 Messagebox.show_warning("Please select a ROI.", "Warning")
 
