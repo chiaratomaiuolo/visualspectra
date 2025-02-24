@@ -46,7 +46,10 @@ def import_from_txt(file_path: str | os.PathLike) -> Tuple[np.array, np.array]:
     bins, content : Tuple[np.array, np.array]
         Numpy arrays containing the bin limits and their content.
     """
-    data = np.loadtxt(file_path)
+    try:
+        data = np.loadtxt(file_path)
+    except ValueError:
+        data = np.loadtxt(file_path, usecols=(0, 1))
 
     if len(data.shape) == 1: # This is the # Energy format
         content = data
