@@ -27,20 +27,24 @@ class SpectraPlotter(ttk.Window):
         # Creating a dictionary of dictionaries containing the infos about the
         # opened files
         self.nbins = nbins # It is needed for having a standard when adding new files
-        self.opened_spectra = {
-            file: {
-                'data': io_utils.import_spectrum(self.current_file, treename=self.get_treename(self.current_file)),
-                'nbins': nbins,
-                'histogram': np.histogram(file['data'], bins=self.nbins),
-                'rois' : [],
-                'calibration_points': [],
-                'calibration_factors': []
-            } for file in file_paths
-        }
+        self.opened_spectra = {}
+        if file_paths:
+            for file in file_paths:
+                self.opened_spectra[file] = {
+                    'data': io_utils.import_spectrum(file, treename=self.get_treename(file), bins=self.nbins),
+                    'nbins': self.nbins,
+                    'histogram': np.histogram(io_utils.import_spectrum(file,\
+                            treename=self.get_treename(file)), bins=self.nbins),
+                    'rois' : [],
+                    'fine_gain': 1.0,
+                    'calibration_points': [],
+                    'calibration_factors': []
+                }
         # Setting the 'current file' for fit purposes
+        self.current_file = None
         # to the last file in the list
         if len(self.opened_spectra) != 0:
-            self.current_file = self.opened_spectra.keys()[-1]
+            self.current_file = file_paths[-1]
             # Importing the data of the current file
             # Constructing the current histogram and saving it as an attribute.
             # NB: (from Matplotlib documentation) If the data has already been 
@@ -145,6 +149,10 @@ class SpectraPlotter(ttk.Window):
         self.convert_button = ttk.Button(self, text="ADC/keV conversion", bootstyle='info', command=self.apply_conversion)
         self.convert_button.place(x=150, y=50)
 
+        # Button for applying a fine gain to the spectrum
+        self.finegain_button = ttk.Button(self, text="Apply fine gain", bootstyle='info', command=self.fine_gain)
+        self.finegain_button.place(x=300, y=50)
+
 
 
         # Button for clearing all
@@ -163,7 +171,7 @@ class SpectraPlotter(ttk.Window):
         else:
             return None
 
-    def plot_spectra(self, file_path: str = None):
+    def plot_spectra(self, file_path: str = None, fine_gain: float = 1):
         """ Method plotting the spectra in the User Interface canva.
         """
         if not file_path: # If a file path is not provided, plot (or re-plot) all opened files
@@ -174,7 +182,7 @@ class SpectraPlotter(ttk.Window):
                 return
             for file_name, file_content in self.opened_spectra.items():
                 try:
-                    spectrum = file_content['data']
+                    spectrum = file_content['data']*file_content['fine_gain']
                     nbins = file_content['nbins']
                     # Checking x axis unit
                     if self.xscale_unit == 'keV':
@@ -209,8 +217,8 @@ class SpectraPlotter(ttk.Window):
             self.ax.grid(True)
             self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
-        else: # If a file path is provided, plot only that file on the current axes
-            spectrum = self.opened_spectra[file_path]['data']
+        else: # If a file path is provided, re-plot only that file on the current axes
+            spectrum = self.opened_spectra[file_path]['data']*self.opened_spectra[file_path]['fine_gain']
             nbins = self.opened_spectra[file_path]['nbins']
             try:
                 if file_path in self.histograms:
@@ -231,8 +239,8 @@ class SpectraPlotter(ttk.Window):
 
             # Update legend with custom colors
             handles, labels = self.ax.get_legend_handles_labels()
-            label_colors = ['red' if file_path == self.current_file\
-                            else 'black' for i in range(len(labels))]
+            label_colors = ['red' if key == self.current_file\
+                            else 'black' for key in self.opened_spectra.keys()]
             self.ax.legend(handles, labels, labelcolor=label_colors)
 
             self.ax.grid(True)
@@ -262,12 +270,13 @@ class SpectraPlotter(ttk.Window):
                         # Rescaling fit parameters
                         # Need to doc how I have derived the parameters
                         roi_popt = [roi_popt[0]/m, roi_popt[1]-(q/m)*roi_popt[0], roi_popt[2]*m, m*(roi_popt[3]+q), roi_popt[4]*m]
-                    self.ax.axvline(x=roi_limits[0], linestyle='--', linewidth=1, color='red')
-                    self.ax.axvline(x=roi_limits[1], color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
+                    self.ax.axvline(x=analysis_utils.adc_to_kev(roi_limits[0], m, q), linestyle='--', linewidth=1, color='red')
+                    self.ax.axvline(x=analysis_utils.adc_to_kev(roi_limits[1], m, q), color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
                     if self.density is False:
                         w = np.linspace(min(roi_binning), max(roi_binning), 1000)
                         self.ax.plot(w, analysis_utils.GaussLine(w, roi_popt))
-                        x_annotate = roi_limits[0] + (roi_limits[1]-roi_limits[0])*0.5
+                        x_annotate = analysis_utils.adc_to_kev(roi_limits[0], m, q) +\
+                            (analysis_utils.adc_to_kev(roi_limits[1], m, q) - analysis_utils.adc_to_kev(roi_limits[0], m, q))*0.5
                         y_annotate = (analysis_utils.GaussLine(roi_binning, roi_popt).max())*0.8
                         self.ax.annotate(f'{roi_id}', xy=(roi_limits[0], 0), xytext=(x_annotate, y_annotate), fontsize=12)
                     else:
@@ -295,6 +304,7 @@ class SpectraPlotter(ttk.Window):
                 'nbins': self.nbins,
                 'histogram': np.histogram(io_utils.import_spectrum(file_path,\
                              treename=self.get_treename(file_path)), bins=self.nbins),
+                'fine_gain': 1.0,
                 'rois' : [],
                 'calibration_points': [],
                 'calibration_factors': []
@@ -673,12 +683,9 @@ class SpectraPlotter(ttk.Window):
                         # Selecting roi limits and fit results
                         roi_lims = roi.limits
                         roi_id = roi.id
-                        fitresults = roi.popt
-                        dfitresults = roi.dpopt
-                        file.write(f'{roi_id}    {roi_lims[0]}    {roi_lims[1]}\
-                                    {fitresults[3]}    {dfitresults[3]}\
-                                    {fitresults[4]}    {dfitresults[4]}\
-                                    {(fitresults[4]/fitresults[3])*2.355}\n')
+                        fitresults = roi.roi_popt
+                        dfitresults = roi.roi_dpopt
+                        file.write(f'{roi_id} {roi_lims[0]} {roi_lims[1]} {fitresults[3]} {dfitresults[3]} {fitresults[4]} {dfitresults[4]} {(fitresults[4]/fitresults[3])*2.355}\n')
             Messagebox.ok(f"{file_path} file created", "Save ROI(s) fit results")
 
     def ask_file_name(self):
@@ -857,6 +864,45 @@ class SpectraPlotter(ttk.Window):
             self.plot_spectra()
             if self.current_roi_number is not None:
                 self.roi_draw()
+
+    # -------------- FINE GAIN BUTTON --------------
+    def fine_gain(self):
+        if not self.opened_spectra.keys():
+            Messagebox.show_warning("No files to select.", "Warning")
+            return
+        # Create a new window for rebinning
+        select_window = ttk.Toplevel(self)
+        select_window.title("Select Spectrum")
+        select_window.geometry("300x250")
+
+        ttk.Label(select_window, text="Select File:").pack(pady=10)
+        file_select = ttk.StringVar(value=self.current_file if self.opened_spectra.keys() else "")
+        file_menu_select = ttk.Combobox(select_window, textvariable=file_select,\
+                                        values=list(self.opened_spectra.keys()))
+        file_menu_select.pack(pady=10)
+
+        ttk.Label(select_window, text="Enter Fine Gain:").pack(pady=10)
+        fine_gain_var = ttk.StringVar(value=self.opened_spectra[file_select.get()]['fine_gain'])
+        fine_gain_entry = ttk.Entry(select_window, textvariable=fine_gain_var)
+        fine_gain_entry.pack(pady=10)
+
+        def apply_fine_gain():
+            selected_file = file_select.get()
+            fine_gain_value = float(fine_gain_var.get())
+            if selected_file:
+                # Changing the fine gain of the selected hist...
+                self.opened_spectra[selected_file]['fine_gain'] = fine_gain_value
+                # And re-plotting it
+                self.plot_spectra()
+                # If some ROIs are already defined, replot them
+                if self.current_roi_number is not None:
+                    self.roi_draw()
+                select_window.destroy()
+            else:
+                Messagebox.show_warning("Please select a file.", "Warning")
+
+        apply_button = ttk.Button(select_window, text="Apply", command=apply_fine_gain)
+        apply_button.pack(pady=10)
     
     # -------------- CLEAR ALL BUTTON --------------
     def clear_all(self):
