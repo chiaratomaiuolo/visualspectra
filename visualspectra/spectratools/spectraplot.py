@@ -702,8 +702,9 @@ class SpectraPlotter(ttk.Window):
                 file.write(f'# Source file(s): {self.opened_spectra.keys()}\n')
                 file.write(f'# Date of creation of this .txt file: {date_string}\n')
                 file.write('# ROI ID    xmin    xmax    mu  dmu sigma   dsigma     res FWHM\n')
-                for spectra in self.opened_spectra.values():
-                    for roi in spectra['rois']:
+                for spectrum_key, spectrum_values in self.opened_spectra.items():
+                    file.write(f'# File: {spectrum_key}, fine gain: {spectrum_values["fine_gain"]}\n')
+                    for roi in spectrum_values['rois']:
                         # Selecting roi limits and fit results
                         roi_lims = roi.limits
                         roi_id = roi.id
