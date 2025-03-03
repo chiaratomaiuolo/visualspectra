@@ -502,7 +502,7 @@ class SpectraPlotter(ttk.Window):
     def onselect(self, xmin, xmax):
         """Callback function to handle the selection of an interval."""
         # Adding the Tuple containing the ROI limits to the dedicated class attribute
-        new_roi = (xmin, xmax)
+        new_roi = [xmin, xmax]
         # Selecting the rois dictionary for the current file
         hist = self.opened_spectra[self.current_file]['histogram']
         rois = self.opened_spectra[self.current_file]['rois'] # This is a list of Roi objects
@@ -912,19 +912,27 @@ class SpectraPlotter(ttk.Window):
 
         def apply_fine_gain():
             selected_file = file_select.get()
-            fine_gain_value = float(fine_gain_var.get())
+            new_fine_gain_value = float(fine_gain_var.get())
             if selected_file:
-                # Changing the fine gain of the selected hist...
-                self.opened_spectra[selected_file]['fine_gain'] = fine_gain_value
+                # Rescaling histogram 
                 self.opened_spectra[selected_file]['histogram'] =\
                 np.histogram(rescale_spectrum(self.opened_spectra[selected_file]['data'],\
-                            self.nbins)*fine_gain_value, bins=np.arange(0, self.nbins+1, 1))
-                
+                            self.nbins)*new_fine_gain_value, bins=np.arange(0, self.nbins+1, 1))
+                # Rescaling ROI limits and re-fitting if necessary
+                if self.opened_spectra[selected_file]['rois']:
+                    current_fine_gain = self.opened_spectra[selected_file]['fine_gain']
+                    # It is necessary to rescale the ROIs and to re-fit
+                    for roi in self.opened_spectra[selected_file]['rois']:
+                        roi.limits[0] *= new_fine_gain_value/current_fine_gain
+                        roi.limits[1] *= new_fine_gain_value/current_fine_gain
+                        roi.roi_popt, roi.roi_dpopt = analysis_utils.onselect(self.opened_spectra[selected_file]['histogram'],\
+                                                            roi.limits[0], roi.limits[1], density=self.density)
+                # Changing the fine gain of the selected hist...
+                self.opened_spectra[selected_file]['fine_gain'] = new_fine_gain_value
                 # And re-plotting it
                 self.plot_spectra()
+                self.roi_draw()
                 # If some ROIs are already defined, replot them
-                if self.current_roi_number is not None:
-                    self.roi_draw()
                 select_window.destroy()
             else:
                 Messagebox.show_warning("Please select a file.", "Warning")
