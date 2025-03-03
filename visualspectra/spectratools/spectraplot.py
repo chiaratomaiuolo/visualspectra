@@ -512,8 +512,7 @@ class SpectraPlotter(ttk.Window):
             roi_mask = (hist[1] >= xmin) & (hist[1] <= xmax)
             # Defining the roi_binning
             roi_binning = hist[1][roi_mask]
-            popt, dpopt = analysis_utils.onselect(hist, xmin, xmax,\
-                                                density=self.density)
+            popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density)
             # Saving 'new' fit results
             rois[roi_index].roi_popt = popt
             rois[roi_index].roi_dpopt = dpopt
@@ -915,8 +914,8 @@ class SpectraPlotter(ttk.Window):
                 # Changing the fine gain of the selected hist...
                 self.opened_spectra[selected_file]['fine_gain'] = fine_gain_value
                 self.opened_spectra[selected_file]['histogram'] =\
-                np.histogram(self.opened_spectra[selected_file]['data']*fine_gain_value,\
-                                    bins=self.opened_spectra[selected_file]['nbins'])
+                np.histogram(rescale_spectrum(self.opened_spectra[selected_file]['data'],\
+                            self.nbins)*fine_gain_value, bins=np.arange(0, self.nbins+1, 1))
                 
                 # And re-plotting it
                 self.plot_spectra()
