@@ -43,7 +43,11 @@ class SpectraPlotter(ttk.Window):
         if file_paths:
             for file in file_paths:
                 # Creating histogram
-                data =  io_utils.import_spectrum(file, treename=self.get_treename(file))
+                data =  np.array(io_utils.import_spectrum(file, treename=self.get_treename(file)))
+                # Multiplying every event by a random value in [0,1)
+                rand = np.random.rand(len(data))
+                data = data+rand
+                # Constructing the bin edges
                 bins = np.arange(0, self.nbins+1, 1)
                 # Storing the rescaled histogram referred to the chosen nbins number
                 histogram = np.histogram(rescale_spectrum(data, self.nbins), bins)
@@ -320,6 +324,12 @@ class SpectraPlotter(ttk.Window):
         if file_path not in self.opened_spectra.keys() and file_path is not None:
             # New file, need to create a new dictionary entry
             data =  io_utils.import_spectrum(file_path, treename=self.get_treename(file_path))
+            # Creating histogram
+            data =  np.array(io_utils.import_spectrum(file_path, treename=self.get_treename(file_path)))
+            # Multiplying every event by a random value in [0,1)
+            rand = np.random.rand(len(data))
+            data = data+rand
+            # Constructing the bin edges
             bins = np.arange(0, self.nbins+1, 1)
             # Storing the rescaled histogram referred to the chosen nbins number
             histogram = np.histogram(rescale_spectrum(data, self.nbins), bins)
