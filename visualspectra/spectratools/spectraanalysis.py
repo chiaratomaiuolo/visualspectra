@@ -154,6 +154,7 @@ def calibration_fit(calibration_points: List[Tuple[float, float]]) -> Tuple[floa
 
     popt, pcov = curve_fit(linear, E_adc, E_kev)
     m, q = popt
+    print(m, q)
     return m, q
 
 def adc_to_kev(adc: float, m: float, q: float) -> float:
