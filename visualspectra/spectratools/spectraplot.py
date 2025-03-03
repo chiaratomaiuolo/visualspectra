@@ -22,9 +22,9 @@ import spectratools.spectraio as io_utils
 def rescale_spectrum(evt_list: List | np.array, new_nbins: int) -> np.array:
     #starting_bins = max(evt_list) + 1
     starting_bins = 16384
-    print(starting_bins)
+    #print(starting_bins)
     refactor = starting_bins / new_nbins
-    print(refactor)
+    #print(refactor)
     evt_list = evt_list/refactor #rounding to ints the refactored list
     return evt_list
 
@@ -205,6 +205,7 @@ class SpectraPlotter(ttk.Window):
                         if file_content['calibration_factors']: # If calibration factors are present
                             m, q = file_content['calibration_factors']
                             spectrum = analysis_utils.adc_to_kev(spectrum, m, q)
+                            bins = analysis_utils.adc_to_kev(bins, m, q)
                         else:
                             spectrum = analysis_utils.adc_to_kev(spectrum, 1, 0)
                     if self.density is False:
@@ -287,6 +288,8 @@ class SpectraPlotter(ttk.Window):
                         # Rescaling fit parameters
                         # Need to doc how I have derived the parameters
                         roi_popt = [roi_popt[0]/m, roi_popt[1]-(q/m)*roi_popt[0], roi_popt[2]*m, m*(roi_popt[3]+q), roi_popt[4]*m]
+                    else:
+                        m, q = 1, 0
                     self.ax.axvline(x=analysis_utils.adc_to_kev(roi_limits[0], m, q), linestyle='--', linewidth=1, color='red')
                     self.ax.axvline(x=analysis_utils.adc_to_kev(roi_limits[1], m, q), color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
                     if self.density is False:
