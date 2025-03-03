@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from tkinter import filedialog
 import ttkbootstrap as ttk
+from typing import List
 from ttkbootstrap.dialogs import Messagebox
 # ... then installed libraries...
 import matplotlib.pyplot as plt
@@ -16,6 +17,17 @@ import numpy as np
 import spectratools.spectraanalysis as analysis_utils
 from  spectratools.spectraanalysis import Roi
 import spectratools.spectraio as io_utils
+
+
+def rescale_spectrum(evt_list: List | np.array, new_nbins: int) -> np.array:
+    #starting_bins = max(evt_list) + 1
+    starting_bins = 16384
+    #print(starting_bins)
+    refactor = starting_bins / new_nbins
+    #print(refactor)
+    evt_list = evt_list/refactor #rounding to ints the refactored list
+    return evt_list
+
 
 class SpectraPlotter(ttk.Window):
     def __init__(self, file_paths: list[str | os.PathLike], nbins: int, **kwargs):
@@ -30,11 +42,15 @@ class SpectraPlotter(ttk.Window):
         self.opened_spectra = {}
         if file_paths:
             for file in file_paths:
+                # Creating histogram
+                data =  io_utils.import_spectrum(file, treename=self.get_treename(file))
+                bins = np.arange(0, self.nbins+1, 1)
+                # Storing the rescaled histogram referred to the chosen nbins number
+                histogram = np.histogram(rescale_spectrum(data, self.nbins), bins)
                 self.opened_spectra[file] = {
-                    'data': io_utils.import_spectrum(file, treename=self.get_treename(file), bins=self.nbins),
+                    'data': data,
                     'nbins': self.nbins,
-                    'histogram': np.histogram(io_utils.import_spectrum(file,\
-                            treename=self.get_treename(file)), bins=self.nbins),
+                    'histogram': histogram,
                     'rois' : [],
                     'fine_gain': 1.0,
                     'calibration_points': [],
@@ -49,8 +65,7 @@ class SpectraPlotter(ttk.Window):
             # Constructing the current histogram and saving it as an attribute.
             # NB: (from Matplotlib documentation) If the data has already been 
             # binned and counted, use bar or stairs to plot the distribution. 
-            self.current_spectrum = np.histogram(self.opened_spectra[file_paths[-1]]['data'],\
-                                                 bins=self.opened_spectra[file_paths[-1]]['nbins'])
+            self.current_spectrum = self.opened_spectra[file_paths[-1]]['histogram']
         # Creating dictionaries containing calibration points and factors for each file
         # Flag that indicates the x scale 
         self.density = False
@@ -171,7 +186,7 @@ class SpectraPlotter(ttk.Window):
         else:
             return None
 
-    def plot_spectra(self, file_path: str = None, fine_gain: float = 1):
+    def plot_spectra(self, file_path: str = None):
         """ Method plotting the spectra in the User Interface canva.
         """
         if not file_path: # If a file path is not provided, plot (or re-plot) all opened files
@@ -182,21 +197,23 @@ class SpectraPlotter(ttk.Window):
                 return
             for file_name, file_content in self.opened_spectra.items():
                 try:
-                    spectrum = file_content['data']*file_content['fine_gain']
                     nbins = file_content['nbins']
+                    bins = np.arange(0, nbins+1, 1)
+                    spectrum = rescale_spectrum(file_content['data'], nbins)
                     # Checking x axis unit
                     if self.xscale_unit == 'keV':
                         if file_content['calibration_factors']: # If calibration factors are present
                             m, q = file_content['calibration_factors']
                             spectrum = analysis_utils.adc_to_kev(spectrum, m, q)
+                            bins = analysis_utils.adc_to_kev(bins, m, q)
                         else:
                             spectrum = analysis_utils.adc_to_kev(spectrum, 1, 0)
                     if self.density is False:
-                        hist = self.ax.hist(spectrum, bins=np.linspace(1, max(spectrum), nbins), alpha=0.6,\
+                        hist = self.ax.hist(spectrum*file_content['fine_gain'], bins=bins, alpha=0.6,\
                                             label=f'{os.path.basename(file_name)}')
                         self.histograms[file_name] = hist[2]  # Save the patches (rectangles) of the histogram
                     else:
-                        hist = self.ax.hist(spectrum, bins=np.linspace(1,max(spectrum), nbins), alpha=0.6,\
+                        hist = self.ax.hist(spectrum*file_content['fine_gain'], bins=bins, alpha=0.6,\
                                             label=f'{os.path.basename(file_name)}', density=True)
                         self.histograms[file_name] = hist[2]  # Save the patches (rectangles) of the histogram
                 except FileNotFoundError:
@@ -218,24 +235,25 @@ class SpectraPlotter(ttk.Window):
             self.ax.autoscale()  # Autoscale the axes
             self.canvas.draw()
         else: # If a file path is provided, re-plot only that file on the current axes
-            spectrum = self.opened_spectra[file_path]['data']*self.opened_spectra[file_path]['fine_gain']
-            nbins = self.opened_spectra[file_path]['nbins']
             try:
                 if file_path in self.histograms:
                     for patch in self.histograms[file_path]:
                         patch.remove()
                     del self.histograms[file_path]
-                spectrum = self.opened_spectra[file_path]['data']
-                if self.density is False:
-                    hist = self.ax.hist(spectrum, bins=nbins, alpha=0.6,\
-                                        label=f'{os.path.basename(file_path)}')
-                    self.histograms[file_path] = hist[2]  # Save the patches of the histogram
-                else:
-                    hist = self.ax.hist(spectrum, bins=self.opened_spectra[file_path]['nbins'],\
-                                        alpha=0.6, label=f'{os.path.basename(file_path)}', density=True)
-                    self.histograms[file_path] = hist[2]
             except FileNotFoundError:
                 Messagebox.show_warning("Warning", f"File {file_path} not found.")
+                return
+            nbins = self.opened_spectra[file_path]['nbins']
+            bins = np.arange(0, nbins+1, 1)
+            spectrum = rescale_spectrum(self.opened_spectra[file_path]['data'], nbins)
+            if self.density is False:
+                hist = self.ax.hist(spectrum*self.opened_spectra[file_path]['fine_gain'], bins=bins, alpha=0.6,\
+                                    label=f'{os.path.basename(file_path)}')
+                self.histograms[file_path] = hist[2]  # Save the patches of the histogram
+            else:
+                hist = self.ax.hist(spectrum*self.opened_spectra[file_path]['fine_gain'], bins=bins,\
+                                    alpha=0.6, label=f'{os.path.basename(file_path)}', density=True)
+                self.histograms[file_path] = hist[2]
 
             # Update legend with custom colors
             handles, labels = self.ax.get_legend_handles_labels()
@@ -270,6 +288,8 @@ class SpectraPlotter(ttk.Window):
                         # Rescaling fit parameters
                         # Need to doc how I have derived the parameters
                         roi_popt = [roi_popt[0]/m, roi_popt[1]-(q/m)*roi_popt[0], roi_popt[2]*m, m*(roi_popt[3]+q), roi_popt[4]*m]
+                    else:
+                        m, q = 1, 0
                     self.ax.axvline(x=analysis_utils.adc_to_kev(roi_limits[0], m, q), linestyle='--', linewidth=1, color='red')
                     self.ax.axvline(x=analysis_utils.adc_to_kev(roi_limits[1], m, q), color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
                     if self.density is False:
@@ -299,11 +319,14 @@ class SpectraPlotter(ttk.Window):
             Messagebox.show_error(f"No valid file provided.", "Error")
         if file_path not in self.opened_spectra.keys() and file_path is not None:
             # New file, need to create a new dictionary entry
+            data =  io_utils.import_spectrum(file_path, treename=self.get_treename(file_path))
+            bins = np.arange(0, self.nbins+1, 1)
+            # Storing the rescaled histogram referred to the chosen nbins number
+            histogram = np.histogram(rescale_spectrum(data, self.nbins), bins)
             self.opened_spectra[file_path] = {
-                'data': io_utils.import_spectrum(file_path, treename=self.get_treename(file_path)),
+                'data': data,
                 'nbins': self.nbins,
-                'histogram': np.histogram(io_utils.import_spectrum(file_path,\
-                             treename=self.get_treename(file_path)), bins=self.nbins),
+                'histogram': histogram,
                 'fine_gain': 1.0,
                 'rois' : [],
                 'calibration_points': [],
@@ -341,19 +364,20 @@ class SpectraPlotter(ttk.Window):
         file_var.get()
         bins_var = ttk.IntVar(value=self.opened_spectra[file_var.get()]['nbins'])
         bins_menu = ttk.Combobox(rebin_window, textvariable=bins_var,\
-                                 values=[128, 256, 512, 1024, 2048, 4096])
+                                 values=[128, 256, 512, 1024, 2048, 4096, 8192, 16384])
         bins_menu.pack(pady=10)
 
         def apply_rebin():
             selected_file = file_var.get()
-            new_bins = bins_var.get()
-            if selected_file and new_bins:
+            new_nbins = bins_var.get()
+            if selected_file and new_nbins:
                 # Changing the binning to the selected file...
-                self.opened_spectra[selected_file]['nbins'] = new_bins
+                self.opened_spectra[selected_file]['nbins'] = new_nbins
+                new_bins = np.arange(0, new_nbins+1, 1)
+                rescaled_data = rescale_spectrum(self.opened_spectra[selected_file]['data'], new_nbins)
                 # ... re-creating the histogram with the new binning
                 self.opened_spectra[selected_file]['histogram'] = \
-                    np.histogram(self.opened_spectra[selected_file]['data'],\
-                                 bins=new_bins)
+                    np.histogram(rescaled_data, bins=new_bins)
                 # If the re-binned histogram is the current one, updating it
                 if selected_file == self.current_file:
                     self.current_spectrum = self.opened_spectra[selected_file]['histogram']
@@ -457,6 +481,7 @@ class SpectraPlotter(ttk.Window):
             if selected_file:
                 # Removing the selected file from the opened_spectra dictionary
                 del self.opened_spectra[selected_file]
+                self.current_file = list(self.opened_spectra.keys())[-1] if self.opened_spectra.keys() else None
                 if selected_file in self.histograms:
                     # Cancelling the histogram from the canva
                     for patch in self.histograms[selected_file]:
@@ -477,7 +502,7 @@ class SpectraPlotter(ttk.Window):
     def onselect(self, xmin, xmax):
         """Callback function to handle the selection of an interval."""
         # Adding the Tuple containing the ROI limits to the dedicated class attribute
-        new_roi = (xmin, xmax)
+        new_roi = [xmin, xmax]
         # Selecting the rois dictionary for the current file
         hist = self.opened_spectra[self.current_file]['histogram']
         rois = self.opened_spectra[self.current_file]['rois'] # This is a list of Roi objects
@@ -490,8 +515,7 @@ class SpectraPlotter(ttk.Window):
             roi_mask = (hist[1] >= xmin) & (hist[1] <= xmax)
             # Defining the roi_binning
             roi_binning = hist[1][roi_mask]
-            popt, dpopt = analysis_utils.onselect(hist, xmin, xmax,\
-                                                density=self.density)
+            popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density)
             # Saving 'new' fit results
             rois[roi_index].roi_popt = popt
             rois[roi_index].roi_dpopt = dpopt
@@ -678,8 +702,9 @@ class SpectraPlotter(ttk.Window):
                 file.write(f'# Source file(s): {self.opened_spectra.keys()}\n')
                 file.write(f'# Date of creation of this .txt file: {date_string}\n')
                 file.write('# ROI ID    xmin    xmax    mu  dmu sigma   dsigma     res FWHM\n')
-                for spectra in self.opened_spectra.values():
-                    for roi in spectra['rois']:
+                for spectrum_key, spectrum_values in self.opened_spectra.items():
+                    file.write(f'# File: {spectrum_key}, fine gain: {spectrum_values["fine_gain"]}\n')
+                    for roi in spectrum_values['rois']:
                         # Selecting roi limits and fit results
                         roi_lims = roi.limits
                         roi_id = roi.id
@@ -888,15 +913,27 @@ class SpectraPlotter(ttk.Window):
 
         def apply_fine_gain():
             selected_file = file_select.get()
-            fine_gain_value = float(fine_gain_var.get())
+            new_fine_gain_value = float(fine_gain_var.get())
             if selected_file:
+                # Rescaling histogram 
+                self.opened_spectra[selected_file]['histogram'] =\
+                np.histogram(rescale_spectrum(self.opened_spectra[selected_file]['data'],\
+                            self.nbins)*new_fine_gain_value, bins=np.arange(0, self.nbins+1, 1))
+                # Rescaling ROI limits and re-fitting if necessary
+                if self.opened_spectra[selected_file]['rois']:
+                    current_fine_gain = self.opened_spectra[selected_file]['fine_gain']
+                    # It is necessary to rescale the ROIs and to re-fit
+                    for roi in self.opened_spectra[selected_file]['rois']:
+                        roi.limits[0] *= new_fine_gain_value/current_fine_gain
+                        roi.limits[1] *= new_fine_gain_value/current_fine_gain
+                        roi.roi_popt, roi.roi_dpopt = analysis_utils.onselect(self.opened_spectra[selected_file]['histogram'],\
+                                                            roi.limits[0], roi.limits[1], density=self.density)
                 # Changing the fine gain of the selected hist...
-                self.opened_spectra[selected_file]['fine_gain'] = fine_gain_value
+                self.opened_spectra[selected_file]['fine_gain'] = new_fine_gain_value
                 # And re-plotting it
                 self.plot_spectra()
+                self.roi_draw()
                 # If some ROIs are already defined, replot them
-                if self.current_roi_number is not None:
-                    self.roi_draw()
                 select_window.destroy()
             else:
                 Messagebox.show_warning("Please select a file.", "Warning")

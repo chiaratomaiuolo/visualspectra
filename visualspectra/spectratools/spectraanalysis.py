@@ -16,9 +16,8 @@ import spectratools.spectraio as io_utils
 class Roi():
     """ Class containing all the interestig characteristics of a ROI.
     """
-    def __init__(self, roi_limits: Tuple[float, float]):
+    def __init__(self, roi_limits: list[float, float]):
         self.limits = roi_limits
-
         @property
         def limits(self):
             return self._limits
@@ -154,6 +153,7 @@ def calibration_fit(calibration_points: List[Tuple[float, float]]) -> Tuple[floa
 
     popt, pcov = curve_fit(linear, E_adc, E_kev)
     m, q = popt
+    print(m, q)
     return m, q
 
 def adc_to_kev(adc: float, m: float, q: float) -> float:
