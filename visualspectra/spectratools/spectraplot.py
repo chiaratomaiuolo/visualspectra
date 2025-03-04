@@ -275,29 +275,30 @@ class SpectraPlotter(ttk.Window):
             # Checking if there are ROIs relative to the spectrum
             if file_content['rois']:
                 # If so, let's plot them
-                hist = file_content['histogram']
-                rois = file_content['rois']
+                hist = file_content['histogram'] #fine gain has been already taken into account
+                rois = file_content['rois'] #fine gain has been already taken into account
                 for roi in rois:
                     roi_id = roi.id
-                    roi_limits = roi.limits
-                    roi_popt = roi.roi_popt
-                    roi_mask = (hist[1] >= roi_limits[0]) & (hist[1] <= roi_limits[1])
-                    roi_binning = hist[1][roi_mask] #Filtered bins content
+                    roi_limits = roi.limits #fine gain has been already taken into account
+                    roi_popt = roi.roi_popt #fine gain has been already taken into account (through re-fit)
+                    roi_mask = (hist[1] >= roi_limits[0]) & (hist[1] <= roi_limits[1]) # in ADC units
+                    roi_binning = hist[1][roi_mask] #Filtered bins content in ADC units
                     if self.xscale_unit == 'keV' and file_content['calibration_factors']:
                         # Need to rescale the ROI limits
                         m, q = file_content['calibration_factors']
-                        roi = (analysis_utils.adc_to_kev(np.array([roi_limits[0]]), m, q),\
-                            analysis_utils.adc_to_kev(np.array([roi_limits[1]]), m, q))
-                        roi_binning = analysis_utils.adc_to_kev(hist[1][roi_mask], m, q)
+                        #roi = (analysis_utils.adc_to_kev(np.array([roi_limits[0]]), m, q),\
+                        #    analysis_utils.adc_to_kev(np.array([roi_limits[1]]), m, q)) # ROI limits in keV units
+                        roi_binning = analysis_utils.adc_to_kev(hist[1][roi_mask], m, q) # ROI bins in keV units
                         # Rescaling fit parameters
                         # Need to doc how I have derived the parameters
-                        roi_popt = [roi_popt[0]/m, roi_popt[1]-(q/m)*roi_popt[0], roi_popt[2]*m, m*(roi_popt[3]+q), roi_popt[4]*m]
+                        roi_popt = [roi_popt[0]/m, roi_popt[1]-(q/m)*roi_popt[0], roi_popt[2]*m, m*(roi_popt[3]+q/m), roi_popt[4]*m]
                     else:
                         m, q = 1, 0
                     self.ax.axvline(x=analysis_utils.adc_to_kev(roi_limits[0], m, q), linestyle='--', linewidth=1, color='red')
                     self.ax.axvline(x=analysis_utils.adc_to_kev(roi_limits[1], m, q), color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
                     if self.density is False:
                         w = np.linspace(min(roi_binning), max(roi_binning), 1000)
+                        w = np.linspace(0, 2000, 2000)
                         self.ax.plot(w, analysis_utils.GaussLine(w, roi_popt))
                         x_annotate = analysis_utils.adc_to_kev(roi_limits[0], m, q) +\
                             (analysis_utils.adc_to_kev(roi_limits[1], m, q) - analysis_utils.adc_to_kev(roi_limits[0], m, q))*0.5
@@ -757,9 +758,9 @@ class SpectraPlotter(ttk.Window):
         tree = ttk.Treeview(dialog, columns=("Bin", "Energy"), show="headings", bootstyle='info')
         tree.heading("Bin", text="Bin Number")
         tree.heading("Energy", text="Energy [keV]")
-        # Need an if that looks if there are no rows []
-        tree.insert("", "end", values=(0, 0), tags=("row",))
-        if self.opened_spectra.get(spectrum_file.get())['calibration_points']:
+        if not self.opened_spectra.get(spectrum_file.get())['calibration_points']:
+            tree.insert("", "end", values=(0, 0), tags=("row",))
+        else:
             calibration_points = self.opened_spectra.get(spectrum_file.get())['calibration_points']
             for bin_number, energy in calibration_points:
                 tree.insert("", "end", values=(bin_number, energy), tags=("row",))
@@ -785,8 +786,11 @@ class SpectraPlotter(ttk.Window):
                     tree.delete(row)
                 # Insert calibration points for the selected file
                 calibration_points = self.opened_spectra[selected_file]['calibration_points']
-                for bin_number, energy in calibration_points:
-                    tree.insert("", "end", values=(bin_number, energy), tags=("row",))
+                if not self.opened_spectra.get(spectrum_file.get())['calibration_points']:
+                    tree.insert("", "end", values=(0, 0), tags=("row",))
+                else:
+                    for bin_number, energy in calibration_points:
+                        tree.insert("", "end", values=(bin_number, energy), tags=("row",))
             else:
                 roi_menu['values'] = []
                 # Clear the treeview
@@ -815,9 +819,16 @@ class SpectraPlotter(ttk.Window):
             tree.insert("", "end", values=("", ""), tags=("row",))
         
         def delete_row():
+            selected_file = spectrum_file.get()
+            spectrum = self.opened_spectra.get(selected_file)
             selected_item = tree.selection()
+            bin_number, energy = tree.item(selected_item)["values"]
             if selected_item:
+                # Deleting the selected item in the calibration pts list
                 tree.delete(selected_item)
+            calibration_point = (float(bin_number), float(energy))
+            if calibration_point in spectrum['calibration_points']:
+                spectrum['calibration_points'].remove(calibration_point)
 
         def on_calibrate():
             selected_file = spectrum_file.get()
@@ -828,7 +839,9 @@ class SpectraPlotter(ttk.Window):
             for row in tree.get_children():
                 bin_number, energy = tree.item(row)["values"]
                 if self.is_float(bin_number) and self.is_float(energy):
-                    spectrum['calibration_points'].append((float(bin_number), float(energy))) #List filled with tuples (bin_number, energy)
+                    calibration_point = (float(bin_number), float(energy))
+                    if calibration_point not in spectrum['calibration_points']:
+                        spectrum['calibration_points'].append((float(bin_number), float(energy))) #List filled with tuples (bin_number, energy)
                 else:
                     Messagebox.show_warning("Please enter valid numbers for bin and energy", "Warning")
                     return
@@ -925,7 +938,7 @@ class SpectraPlotter(ttk.Window):
             selected_file = file_select.get()
             new_fine_gain_value = float(fine_gain_var.get())
             if selected_file:
-                # Rescaling histogram 
+                # Rescaling histogram
                 self.opened_spectra[selected_file]['histogram'] =\
                 np.histogram(rescale_spectrum(self.opened_spectra[selected_file]['data'],\
                             self.nbins)*new_fine_gain_value, bins=np.arange(0, self.nbins+1, 1))
