@@ -512,7 +512,12 @@ class SpectraPlotter(ttk.Window):
     def onselect(self, xmin, xmax):
         """Callback function to handle the selection of an interval."""
         # Adding the Tuple containing the ROI limits to the dedicated class attribute
+        if self.xscale_unit == 'keV' and self.opened_spectra[self.current_file]['calibration_factors']:
+            m, q = self.opened_spectra[self.current_file]['calibration_factors']
+            xmin = analysis_utils.kev_to_adc(xmin, m, q)
+            xmax = analysis_utils.kev_to_adc(xmax, m, q)
         new_roi = [xmin, xmax]
+        print(new_roi)
         # Selecting the rois dictionary for the current file
         hist = self.opened_spectra[self.current_file]['histogram']
         rois = self.opened_spectra[self.current_file]['rois'] # This is a list of Roi objects
@@ -547,6 +552,12 @@ class SpectraPlotter(ttk.Window):
             roi.id = self.current_roi_number
             rois.append(roi)
             # Incrementing the global ROI number
+        # Plot part - need to check if keV or ADC units
+        if self.xscale_unit == 'keV' and self.opened_spectra[self.current_file]['calibration_factors']:
+            roi_binning = analysis_utils.adc_to_kev(hist[1][roi_mask], m, q) # ROI bins in keV units
+            popt = [popt[0]/m, popt[1]-(q/m)*popt[0], popt[2]*m, m*(popt[3]+q/m), popt[4]*m]
+            xmin = analysis_utils.adc_to_kev(xmin, m, q)
+            xmax = analysis_utils.adc_to_kev(xmax, m, q)
         # Tracing the vertical lines defining the ROI
         self.ax.axvline(x=xmin, linestyle='--', linewidth=1, color='red')
         self.ax.axvline(x=xmax, color=plt.gca().lines[-1].get_color(),\
