@@ -298,7 +298,6 @@ class SpectraPlotter(ttk.Window):
                     self.ax.axvline(x=analysis_utils.adc_to_kev(roi_limits[1], m, q), color=plt.gca().lines[-1].get_color(), linestyle='--', linewidth=1)
                     if self.density is False:
                         w = np.linspace(min(roi_binning), max(roi_binning), 1000)
-                        w = np.linspace(0, 2000, 2000)
                         self.ax.plot(w, analysis_utils.GaussLine(w, roi_popt))
                         x_annotate = analysis_utils.adc_to_kev(roi_limits[0], m, q) +\
                             (analysis_utils.adc_to_kev(roi_limits[1], m, q) - analysis_utils.adc_to_kev(roi_limits[0], m, q))*0.5
