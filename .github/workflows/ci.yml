@@ -3,7 +3,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
     - name: Checkout code
@@ -27,13 +27,12 @@ jobs:
     
     - name: Install ROOT Framework
       run: |
-        sudo snap install root-framework
-  
-    - name: Run ROOT Framework
-      run: |
-        snap run root-framework -b -q -l <<EOF
-        .x your_root_script.C
-        EOF
+        git clone --branch latest-stable --depth=1 https://github.com/root-project/root.git root_src
+        mkdir root_build root_install
+        cd root_build
+        cmake -G"Visual Studio 16 2019" -A Win32 -Thost=x64 -DCMAKE_VERBOSE_MAKEFILE=_PREFIX=../root_install ../root_src
+        cmake --build . --config Release --target install
+        ../root_install/bin/thisroot.bat
 
     - name: Build executable
       run: pyinstaller --onefile scripts/create_executable.py
