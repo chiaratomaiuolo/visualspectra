@@ -1,5 +1,5 @@
 # Python version requirements
-python_version == 3.11.7 # because of ROOT library need
+#python_version == 3.11.7 # because of ROOT library need
 # Python package requirements
 matplotlib
 numpy
