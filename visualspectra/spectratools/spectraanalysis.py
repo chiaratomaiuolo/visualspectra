@@ -125,6 +125,8 @@ def roi_fit(spectrum: np.array, roi_min: float, roi_max: float, density: bool=Fa
         dpopt.append(fitresults.Error(i))
     # Print the fit results
     fitresults.Print()
+    print(f'Number of events inside the ROI: {roi_content.sum()}')
+    print(f'Number of events from the fit: {popt[2]}')
 
     # Returning fit parameters and their errors
     return np.array(popt), np.array(dpopt)
@@ -160,4 +162,9 @@ def adc_to_kev(adc: float, m: float, q: float) -> float:
     """ Function for the conversion of an ADC value to a keV value.
     """
     return m*adc + q
+
+def kev_to_adc(kev: float, m: float, q: float) -> float:
+    """ Function for the conversion of an keV value to an ADC value.
+    """
+    return (kev - q)/m
 
