@@ -16,19 +16,27 @@ jobs:
       with:
         python-version: '3.11.7'
 
-    - name: Install dependencies
+    - name: Install PyInstaller
       run: |
         python -m pip install --upgrade pip
         pip install pyinstaller
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Set environment variable
+      run: echo "DIST_DIR=$(pwd)/dist" >> $GITHUB_ENV
 
     - name: Build executable
       run: pyinstaller --onefile scripts/create_executable.py
     
     - name: List files in dist
-      run: ls -la /home/runner/work/visualspectra/visualspectra/dist
-  
-    - name: Upload executable
+      run: ls -la ${{ env.DIST_DIR }}
+
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: VisualizeSpectra
-        path: /home/runner/work/visualspectra/visualspectra/dist/VisualizeSpectra
+        name: create_executable
+        path: ${{ env.DIST_DIR }}/create_executable
