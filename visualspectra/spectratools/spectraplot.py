@@ -35,6 +35,23 @@ def load_calibration_factors(file: str | os.PathLike) -> List[float]:
         except:
             print(f'No calibration factors found in {file}. Returning [1, 0]')
             return [1, 0]
+    elif io_utils.check_file_format(file) == 'txt':
+         with open(file, 'r+') as file:
+                lines = file.readlines()
+                # Removing last line if it is a comment, it means that 
+                # the calibration factors are already present and has to be updated
+                if lines[-1].startswith('#'):
+                    # Store it in a variable in order to extract the values later
+                    calibration_line = lines[-1]
+                    # Removing the comment symbol, dividing values and extracting them
+                    calibration_values = calibration_line.lstrip("# ").strip().split()
+
+                    # Converti i valori in numeri (float)
+                    m, q = [float(value) for value in calibration_values]
+                    return m, q
+                else:
+                    print(f'No calibration factors found in {file}. Returning [1, 0]')
+                    return [1, 0]
     else:
         print(f'Loading not implemented for this format. Returning [1, 0]')
         return [1, 0]
@@ -976,10 +993,31 @@ class SpectraPlotter(ttk.Window):
                 # Filling with the calibration factors
                 calibration_tree.Fill()
 
-                # Scrittura dei TTrees nel file di output
+                # Writing the TTree containing m and q in the file
                 spectrum_file.Write()
                 spectrum_file.Close()
                 Messagebox.show_info("Calibration factors saved in the ROOT file", "Info")
+            elif io_utils.check_file_format(self.current_file) == 'txt':
+                # Saving the calibration factors in a .txt file
+                # The main idea is to store them in a commented line at the end of the file
+                with open(self.current_file, 'r+') as file:
+                    lines = file.readlines()
+                    # Removing last line if it is a comment, it means that 
+                    # the calibration factors are already present and has to be updated
+                    if lines[-1].startswith('#'):
+                        lines = lines[:-1]
+                    
+                    new_line = f'#  {calibration_factors[0]} {calibration_factors[1]}'
+                    # Aggiungi la nuova riga
+                    lines.append(new_line)
+                    
+                    # Vai all'inizio del file e scrivi le righe modificate
+                    file.seek(0)
+                    file.writelines(lines)
+                    
+                    # Trunca il file alla nuova lunghezza
+                    file.truncate()
+                    Messagebox.show_info("Calibration factors saved in the .txt file", "Info")
             else:
                 Messagebox.show_error("Calibration saving not yet implemented for this format", "Error")
         else:
