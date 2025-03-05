@@ -31,4 +31,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: VisualizeSpectra
-        path: dist/VisualizeSpectra
+        path: /home/runner/work/visualspectra/visualspectra/dist/VisualizeSpectra
