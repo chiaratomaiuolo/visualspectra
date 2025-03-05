@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.widgets import SpanSelector
 import numpy as np
+import ROOT as root
 # ... and eventually local modules
 import spectratools.spectraanalysis as analysis_utils
 from  spectratools.spectraanalysis import Roi
@@ -169,8 +170,12 @@ class SpectraPlotter(ttk.Window):
         self.convert_button.place(x=150, y=50)
 
         # Button for applying a fine gain to the spectrum
+        self.save_calibration = ttk.Button(self, text="Save current calibration", bootstyle='info', command=self.apply_save_calibration)
+        self.save_calibration.place(x=300, y=50)
+
+        # Button for applying a fine gain to the spectrum
         self.finegain_button = ttk.Button(self, text="Apply fine gain", bootstyle='info', command=self.fine_gain)
-        self.finegain_button.place(x=300, y=50)
+        self.finegain_button.place(x=470, y=50)
 
 
 
@@ -922,6 +927,37 @@ class SpectraPlotter(ttk.Window):
             self.plot_spectra()
             if self.current_roi_number is not None:
                 self.roi_draw()
+    
+    def apply_save_calibration(self):
+        if self.opened_spectra[self.current_file]['calibration_factors']:
+            calibration_factors = self.opened_spectra[self.current_file]['calibration_factors']
+            if io_utils.check_file_format(self.current_file) == 'root':
+                # Opening the current file...
+                spectrum_file = root.TFile(self.current_file, "UPDATE")
+                # Check if the TTree already exists
+                if spectrum_file.GetListOfKeys().Contains("calibration_values"):
+                    # Remove the existing TTree
+                    spectrum_file.Delete("calibration_values;*")
+
+                # Creating (or re-creating) a TTree that will contain the calibration values
+                calibration_tree = root.TTree("calibration_values", "Tree with calibration factors")
+
+                # Creating the array containing the calibration factors
+                calibration_values = np.array([calibration_factors], dtype=np.float32)
+
+                # Adding the array to the TTree
+                calibration_tree.Branch("calibration_factors", calibration_values, "global_values[2]/F")
+
+                # Filling with the calibration factors
+                calibration_tree.Fill()
+
+                # Scrittura dei TTrees nel file di output
+                spectrum_file.Write()
+                spectrum_file.Close()
+            else:
+                Messagebox.show_error("Calibration saving not yet implemented for this format", "Error")
+        else:
+            Messagebox.show_warning("No calibration factors to save", "Warning")
 
     # -------------- FINE GAIN BUTTON --------------
     def fine_gain(self):
