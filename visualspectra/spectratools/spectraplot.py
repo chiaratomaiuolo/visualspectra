@@ -20,6 +20,25 @@ from  spectratools.spectraanalysis import Roi
 import spectratools.spectraio as io_utils
 
 
+def load_calibration_factors(file: str | os.PathLike) -> List[float]:
+    """ Load the calibration factors from a file.
+    """
+    if io_utils.check_file_format(file) == 'root':
+        spectrum_file = root.TFile(file, "READ")
+        try:
+            calibration_tree = spectrum_file.Get("calibration_values")
+            calibration_tree.GetEntry(0)
+            # Getting the calibration factors
+            m = calibration_tree.m
+            q = calibration_tree.q
+            return m, q
+        except:
+            print(f'No calibration factors found in {file}. Returning [1, 0]')
+            return [1, 0]
+    else:
+        print(f'Loading not implemented for this format. Returning [1, 0]')
+        return [1, 0]
+
 def rescale_spectrum(evt_list: List | np.array, new_nbins: int) -> np.array:
     #starting_bins = max(evt_list) + 1
     starting_bins = 16384
@@ -52,6 +71,8 @@ class SpectraPlotter(ttk.Window):
                 bins = np.arange(0, self.nbins+1, 1)
                 # Storing the rescaled histogram referred to the chosen nbins number
                 histogram = np.histogram(rescale_spectrum(data, self.nbins), bins)
+                # Loading calibration factors if present
+                m, q = load_calibration_factors(file)
                 self.opened_spectra[file] = {
                     'data': data,
                     'nbins': self.nbins,
@@ -59,7 +80,7 @@ class SpectraPlotter(ttk.Window):
                     'rois' : [],
                     'fine_gain': 1.0,
                     'calibration_points': [],
-                    'calibration_factors': []
+                    'calibration_factors': [m, q]
                 }
         # Setting the 'current file' for fit purposes
         self.current_file = None
@@ -338,6 +359,8 @@ class SpectraPlotter(ttk.Window):
             bins = np.arange(0, self.nbins+1, 1)
             # Storing the rescaled histogram referred to the chosen nbins number
             histogram = np.histogram(rescale_spectrum(data, self.nbins), bins)
+            # Loading calibration factors if present
+            m, q = load_calibration_factors(file_path)
             self.opened_spectra[file_path] = {
                 'data': data,
                 'nbins': self.nbins,
@@ -345,7 +368,7 @@ class SpectraPlotter(ttk.Window):
                 'fine_gain': 1.0,
                 'rois' : [],
                 'calibration_points': [],
-                'calibration_factors': []
+                'calibration_factors': [m, q]
             }
             # Changing the current file to the new one
             self.current_file = file_path
@@ -861,6 +884,7 @@ class SpectraPlotter(ttk.Window):
                     Messagebox.show_warning("Please enter valid numbers for bin and energy", "Warning")
                     return
             self.apply_calibration(selected_file, spectrum['calibration_points'])
+
         def on_double_click(event):
             item = tree.selection()[0]
             column = tree.identify_column(event.x)
@@ -942,18 +966,20 @@ class SpectraPlotter(ttk.Window):
                 # Creating (or re-creating) a TTree that will contain the calibration values
                 calibration_tree = root.TTree("calibration_values", "Tree with calibration factors")
 
-                # Creating the array containing the calibration factors
-                calibration_values = np.array([calibration_factors], dtype=np.float32)
+                 # Creating the variables to hold the calibration factors
+                m = np.array([calibration_factors[0]], dtype=np.float32)
+                q = np.array([calibration_factors[1]], dtype=np.float32)
 
-                # Adding the array to the TTree
-                calibration_tree.Branch("calibration_factors", calibration_values, "global_values[2]/F")
-
+                # Adding the variables to the TTree with named branches
+                calibration_tree.Branch("m", m, "m/F")
+                calibration_tree.Branch("q", q, "q/F")
                 # Filling with the calibration factors
                 calibration_tree.Fill()
 
                 # Scrittura dei TTrees nel file di output
                 spectrum_file.Write()
                 spectrum_file.Close()
+                Messagebox.show_info("Calibration factors saved in the ROOT file", "Info")
             else:
                 Messagebox.show_error("Calibration saving not yet implemented for this format", "Error")
         else:
