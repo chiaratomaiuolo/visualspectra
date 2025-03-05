@@ -4,8 +4,8 @@ import sys
 from ttkbootstrap.dialogs import Messagebox
 # ... then installed libraries...
 # ... and eventually local modules.
-from spectratools.spectraio import create_parser, check_file_format
-from spectratools.spectraplot import SpectraPlotter
+from visualspectra.spectraio import create_parser, check_file_format
+from visualspectra.spectraplot import SpectraPlotter
 
 def main():
     # Parsing arguments from parser

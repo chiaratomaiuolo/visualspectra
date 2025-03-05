@@ -11,7 +11,7 @@ import ROOT as root
 from scipy.optimize import curve_fit
 from uncertainties import ufloat
 # ... and eventually local modules
-import spectratools.spectraio as io_utils
+import visualspectra.spectraio as io_utils
 
 class Roi():
     """ Class containing all the interestig characteristics of a ROI.

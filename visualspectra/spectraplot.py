@@ -15,9 +15,9 @@ from matplotlib.widgets import SpanSelector
 import numpy as np
 import ROOT as root
 # ... and eventually local modules
-import spectratools.spectraanalysis as analysis_utils
-from  spectratools.spectraanalysis import Roi
-import spectratools.spectraio as io_utils
+import visualspectra.spectraanalysis as analysis_utils
+from  visualspectra.spectraanalysis import Roi
+import visualspectra.spectraio as io_utils
 
 
 def load_calibration_factors(file: str | os.PathLike) -> List[float]:
