@@ -3,7 +3,7 @@
 # Python package requirements
 matplotlib
 numpy
-ROOT
+#ROOT
 scipy
 tkinter
 ttkinterbootstrap

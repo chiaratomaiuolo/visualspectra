@@ -25,6 +25,16 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+    
+    - name: Install ROOT Framework
+      run: |
+        sudo snap install root-framework
+  
+    - name: Run ROOT Framework
+      run: |
+        snap run root-framework -b -q -l <<EOF
+        .x your_root_script.C
+        EOF
 
     - name: Build executable
       run: pyinstaller --onefile scripts/create_executable.py
