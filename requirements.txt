@@ -6,6 +6,6 @@ numpy
 #ROOT
 scipy
 #tkinter
-ttkinterbootstrap
+ttkbootstrap
 uncertainties
 uproot
