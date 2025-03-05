@@ -9,4 +9,4 @@ PyInstaller.__main__.run([
     '--distpath=dist',     # Directory di output
 ])
 
-#print("Eseguibile creato in: dist/VisualizeSpectra")
+print("Eseguibile creato in: dist/VisualizeSpectra")
