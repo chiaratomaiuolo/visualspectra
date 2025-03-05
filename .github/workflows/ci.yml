@@ -1,10 +1,5 @@
-name: CI/CD Pipeline
-
 on:
   push:
-    branches:
-      - main
-  pull_request:
     branches:
       - main
 
@@ -16,30 +11,21 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
       with:
-        node-version: '14'
+        python-version: '3.11.7'
 
     - name: Install dependencies
-      run: npm install
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
 
-    - name: Run tests
-      run: npm test
-
-    - name: Build project
-      run: npm run build
-
-    - name: Deploy to production
-      if: github.ref == 'refs/heads/main'
-      run: npm run deploy
-
-    - name: Create Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Build executable
+      run: pyinstaller --onefile mio_script.py
+  
+    - name: Upload executable
+      uses: actions/upload-artifact@v2
       with:
-        tag_name: v1.0.0
-        release_name: Release v1.0.0
-        body: |
-            Release notes for version 1.0.0
+        name: mio_script_executable
+        path: dist/mio_script
