@@ -27,8 +27,7 @@ jobs:
         cd root_build
         cmake -G"Visual Studio 16 2019" -A Win32 -Thost=x64 -DCMAKE_VERBOSE_MAKEFILE=_PREFIX=../root_install ../root_src
         cmake --build . --config Release --target install
-        cd ../root_install/bin
-        ./thisroot.ps1
+        ..\root_install\bin\thisroot.bat
 
     - name: Build executable
       run: pyinstaller --onefile scripts/create_executable.py
