@@ -453,7 +453,7 @@ class SpectraPlotter(ttk.Window):
                                 or (line.get_xdata()[0] >= roi.limits[0] and line.get_xdata()[0] <= roi.limits[1]):
                                 line.remove()
                         # Re-fitting the ROIs without incrementing the ROI number
-                        self.onselect(roi.limits[0], roi.limits[1], increase=False)
+                        self.onselect(roi.limits[0], roi.limits[1])
                 rebin_window.destroy()
             else:
                 Messagebox.show_warning("Please select a file and number of bins.", "Warning")
@@ -557,12 +557,12 @@ class SpectraPlotter(ttk.Window):
     def onselect(self, xmin, xmax):
         """Callback function to handle the selection of an interval."""
         # Adding the Tuple containing the ROI limits to the dedicated class attribute
-        if self.xscale_unit == 'keV' and self.opened_spectra[self.current_file]['calibration_factors']:
-            m, q = self.opened_spectra[self.current_file]['calibration_factors']
+        m, q = self.opened_spectra[self.current_file]['calibration_factors']
+        if self.xscale_unit == 'keV':
+            #m, q = self.opened_spectra[self.current_file]['calibration_factors']
             xmin = analysis_utils.kev_to_adc(xmin, m, q)
             xmax = analysis_utils.kev_to_adc(xmax, m, q)
         new_roi = [xmin, xmax]
-        print(new_roi)
         # Selecting the rois dictionary for the current file
         hist = self.opened_spectra[self.current_file]['histogram']
         rois = self.opened_spectra[self.current_file]['rois'] # This is a list of Roi objects
@@ -575,7 +575,10 @@ class SpectraPlotter(ttk.Window):
             roi_mask = (hist[1] >= xmin) & (hist[1] <= xmax)
             # Defining the roi_binning
             roi_binning = hist[1][roi_mask]
-            popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density)
+            if self.xscale_unit == 'keV':
+                popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density, calibration_factors=[m, q])
+            else:
+                popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density, calibration_factors=None)
             # Saving 'new' fit results
             rois[roi_index].roi_popt = popt
             rois[roi_index].roi_dpopt = dpopt
@@ -586,8 +589,15 @@ class SpectraPlotter(ttk.Window):
             roi_mask = (hist[1] >= xmin) & (hist[1] <= xmax)
             # Defining the roi_binning
             roi_binning = hist[1][roi_mask]
-            popt, dpopt = analysis_utils.onselect(hist, xmin, xmax,\
-                                                density=self.density)
+            #if self.xscale_unit == 'keV' and self.opened_spectra[self.current_file]['calibration_factors']:
+            #    popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density, calibration_factors=[m, q])
+            #else:
+            #    popt, dpopt = analysis_utils.onselect(hist, xmin, xmax,\
+            #                                    density=self.density)
+            if self.xscale_unit == 'keV':
+                popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density, calibration_factors=[m, q])
+            else:
+                popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density, calibration_factors=None)
             # Saving fit results
             roi.roi_popt = popt
             roi.roi_dpopt = dpopt
@@ -759,7 +769,7 @@ class SpectraPlotter(ttk.Window):
             # Aggiungi un timestamp al nome del file per evitare sovrascritture
             file_name = f"{file_name}.txt"
             # Ottieni il percorso del file
-            file_path = ((Path(__file__).parent).parent).parent / 'fitresults' / file_name
+            file_path = ((Path(__file__).parent).parent) / 'fitresults' / file_name
             # Crea la directory se non esiste
             #file_path.parent.mkdir(parents=True, exist_ok=True)
             # Scrivi i risultati nel file

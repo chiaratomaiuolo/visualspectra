@@ -131,7 +131,7 @@ def roi_fit(spectrum: np.array, roi_min: float, roi_max: float, density: bool=Fa
     # Returning fit parameters and their errors
     return np.array(popt), np.array(dpopt)
 
-def onselect(spectrum, xmin, xmax, density: bool=False):
+def onselect(spectrum, xmin, xmax, density: bool=False, calibration_factors=None):
     """Callback function to handle the selection of an interval.
        Once the ROI has been selected, a fit with a GaussLine model is performed inside.
     """
@@ -139,8 +139,23 @@ def onselect(spectrum, xmin, xmax, density: bool=False):
     popt, dpopt = roi_fit(spectrum, xmin, xmax, density=density)
     # Printing the parameters on terminal...
     par_names = ['m', 'q', 'N', 'mu', 'sigma']
-    for name, par, dpar in zip(par_names, popt, dpopt):
-        print(f'{name} = {par} +/- {dpar}')
+    if calibration_factors is not None and calibration_factors != [1,0]:
+        try:
+            m, q = calibration_factors
+            kev_popt = [popt[0]/m, popt[1]-(q/m)*popt[0], popt[2]*m, m*(popt[3]+q/m), popt[4]*m]
+            for name, par, dpar in zip(par_names, kev_popt, dpopt):
+                print(f'{name} = {par} +/- {dpar} [keV]')
+        except:
+            print('Error in the calibration factors, saving the parameters in ADC counts...')
+            # Printing the parameters on terminal...
+            par_names = ['m', 'q', 'N', 'mu', 'sigma']
+            for name, par, dpar in zip(par_names, popt, dpopt):
+                print(f'{name} = {par} +/- {dpar}')
+            # ... eventually returning them to the SpectraPlotter class.
+            return popt, dpopt
+    else:
+        for name, par, dpar in zip(par_names, popt, dpopt):
+            print(f'{name} = {par} +/- {dpar} [ADC counts]')
     # ... eventually returning them to the SpectraPlotter class.
     return popt, dpopt
 
