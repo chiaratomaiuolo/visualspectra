@@ -79,19 +79,22 @@ class SpectraPlotter(ttk.Window):
         self.opened_spectra = {}
         if file_paths:
             for file in file_paths:
-                # Creating histogram
-                data =  np.array(io_utils.import_spectrum(file, treename=self.get_treename(file)))
-                # Multiplying every event by a random value in [0,1)
-                rand = np.random.rand(len(data))
-                data = data+rand
-                # Constructing the bin edges
-                bins = np.arange(0, self.nbins+1, 1)
-                # Storing the rescaled histogram referred to the chosen nbins number
-                histogram = np.histogram(rescale_spectrum(data, self.nbins), bins)
+                if file.endswith('.n42'):
+                    histogram = io_utils.import_from_n42(file)
+                else:
+                    # Creating histogram from list
+                    data =  np.array(io_utils.import_spectrum(file, treename=self.get_treename(file)))
+                    # Multiplying every event by a random value in [0,1)
+                    rand = np.random.rand(len(data))
+                    data = data+rand
+                    # Constructing the bin edges
+                    bins = np.arange(0, self.nbins+1, 1)
+                    # Storing the rescaled histogram referred to the chosen nbins number
+                    histogram = np.histogram(rescale_spectrum(data, self.nbins), bins)
                 # Loading calibration factors if present
                 m, q = load_calibration_factors(file)
                 self.opened_spectra[file] = {
-                    'data': data,
+                    'data': None if file.endswith(".n42") else data,
                     'nbins': self.nbins,
                     'histogram': histogram,
                     'rois' : [],
@@ -361,25 +364,33 @@ class SpectraPlotter(ttk.Window):
         file_path = filedialog.askopenfilename(title="Select a file", \
                                                filetypes=[("ROOT files", "*.root"),\
                                                           ("CSV files", "*.csv"),\
-                                                          ("TXT files", "*.txt")])
+                                                          ("TXT files", "*.txt"),
+                                                          ("N42 files", "*.n42")])
         if not file_path:
             Messagebox.show_error(f"No valid file provided.", "Error")
         if file_path not in self.opened_spectra.keys() and file_path is not None:
-            # New file, need to create a new dictionary entry
-            data =  io_utils.import_spectrum(file_path, treename=self.get_treename(file_path))
-            # Creating histogram
-            data =  np.array(io_utils.import_spectrum(file_path, treename=self.get_treename(file_path)))
-            # Multiplying every event by a random value in [0,1)
-            rand = np.random.rand(len(data))
-            data = data+rand
-            # Constructing the bin edges
-            bins = np.arange(0, self.nbins+1, 1)
-            # Storing the rescaled histogram referred to the chosen nbins number
-            histogram = np.histogram(rescale_spectrum(data, self.nbins), bins)
+            if file_path.endswith('.n42'):
+                histogram = io_utils.import_from_n42(file_path)
+                print(type(histogram))
+                rand = np.random.rand(len(histogram))
+                histogram = histogram.astype(np.float64)
+                histogram += rand
+            else:
+                # New file, need to create a new dictionary entry
+                data =  io_utils.import_spectrum(file_path, treename=self.get_treename(file_path))
+                # Creating histogram
+                data =  np.array(io_utils.import_spectrum(file_path, treename=self.get_treename(file_path)))
+                # Multiplying every event by a random value in [0,1)
+                rand = np.random.rand(len(data))
+                data = data+rand
+                # Constructing the bin edges
+                bins = np.arange(0, self.nbins+1, 1)
+                # Storing the rescaled histogram referred to the chosen nbins number
+                histogram = np.histogram(rescale_spectrum(data, self.nbins), bins)
             # Loading calibration factors if present
             m, q = load_calibration_factors(file_path)
             self.opened_spectra[file_path] = {
-                'data': data,
+                'data': None if file_path.endswith(".n42") else data,
                 'nbins': self.nbins,
                 'histogram': histogram,
                 'fine_gain': 1.0,
