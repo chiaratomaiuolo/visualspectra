@@ -57,14 +57,10 @@ def load_calibration_factors(file: str | os.PathLike) -> List[float]:
         return [1, 0]
 
 def rescale_spectrum(evt_list: List | np.array, new_nbins: int) -> np.array:
-    #starting_bins = max(evt_list) + 1
     starting_bins = 16384
-    #print(starting_bins)
     refactor = starting_bins / new_nbins
-    #print(refactor)
     evt_list = evt_list/refactor #rounding to ints the refactored list
     return evt_list
-
 
 class SpectraPlotter(ttk.Window):
     def __init__(self, file_paths: list[str | os.PathLike], nbins: int, **kwargs):
@@ -80,10 +76,21 @@ class SpectraPlotter(ttk.Window):
         if file_paths:
             for file in file_paths:
                 if file.endswith('.n42'):
+                    # The file provides the spectrum, not an event list
                     histogram = io_utils.import_from_n42(file)
+                    m, q = load_calibration_factors(file)
+                    self.opened_spectra[file] = {
+                        'data': None, #The only spectrum is provided
+                        'nbins': len(histogram),
+                        'histogram': [histogram, np.arange(0, len(histogram)+1, step=1)],
+                        'rois' : [],
+                        'fine_gain': 1.0,
+                        'calibration_points': [],
+                        'calibration_factors': [m, q]
+                    }
                 else:
                     # Creating histogram from list
-                    data =  np.array(io_utils.import_spectrum(file, treename=self.get_treename(file)))
+                    data =  np.array(io_utils.import_list(file, treename=self.get_treename(file)))
                     # Multiplying every event by a random value in [0,1)
                     rand = np.random.rand(len(data))
                     data = data+rand
@@ -94,7 +101,7 @@ class SpectraPlotter(ttk.Window):
                 # Loading calibration factors if present
                 m, q = load_calibration_factors(file)
                 self.opened_spectra[file] = {
-                    'data': None if file.endswith(".n42") else data,
+                    'data': data,
                     'nbins': self.nbins,
                     'histogram': histogram,
                     'rois' : [],
@@ -105,7 +112,7 @@ class SpectraPlotter(ttk.Window):
         # Setting the 'current file' for fit purposes
         self.current_file = None
         # to the last file in the list
-        if len(self.opened_spectra) != 0:
+        if len(self.opened_spectra) or len(self.opened_spectra)!= 0:
             self.current_file = file_paths[-1]
             # Importing the data of the current file
             # Constructing the current histogram and saving it as an attribute.
@@ -249,7 +256,8 @@ class SpectraPlotter(ttk.Window):
                 try:
                     nbins = file_content['nbins']
                     bins = np.arange(0, nbins+1, 1)
-                    spectrum = rescale_spectrum(file_content['data'], nbins)
+                    spectrum = rescale_spectrum(file_content['data'], nbins) \
+                        if file_content['data'] is not None else file_content['histogram'][0]
                     # Checking x axis unit
                     if self.xscale_unit == 'keV':
                         if file_content['calibration_factors']: # If calibration factors are present
@@ -259,13 +267,21 @@ class SpectraPlotter(ttk.Window):
                         else:
                             spectrum = analysis_utils.adc_to_kev(spectrum, 1, 0)
                     if self.density is False:
-                        hist = self.ax.hist(spectrum*file_content['fine_gain'], bins=bins, alpha=0.6,\
-                                            label=f'{os.path.basename(file_name)}')
-                        self.histograms[file_name] = hist[2]  # Save the patches (rectangles) of the histogram
+                        if file_content['data'] is not None:
+                            hist = self.ax.hist(spectrum*file_content['fine_gain'], bins=bins, alpha=0.6,\
+                                                label=f'{os.path.basename(file_name)}')
+                            self.histograms[file_name] = hist[2]  # Save the patches (rectangles) of the histogram
+                        else:
+                            hist = self.ax.stairs(spectrum*file_content['fine_gain'], alpha=0.6,\
+                                                label=f'{os.path.basename(file_name)}')
                     else:
-                        hist = self.ax.hist(spectrum*file_content['fine_gain'], bins=bins, alpha=0.6,\
-                                            label=f'{os.path.basename(file_name)}', density=True)
-                        self.histograms[file_name] = hist[2]  # Save the patches (rectangles) of the histogram
+                        if file_content['data'] is not None:
+                            hist = self.ax.hist(spectrum*file_content['fine_gain'], bins=bins, alpha=0.6,\
+                                                label=f'{os.path.basename(file_name)}')
+                            self.histograms[file_name] = hist[2]  # Save the patches (rectangles) of the histogram
+                        else:
+                            hist = self.ax.stairs(spectrum*file_content['fine_gain'], alpha=0.6,\
+                                                label=f'{os.path.basename(file_name)}')
                 except FileNotFoundError:
                     Messagebox.show_warning(f"File {file_name} not found.", "Warning")
 
@@ -295,15 +311,24 @@ class SpectraPlotter(ttk.Window):
                 return
             nbins = self.opened_spectra[file_path]['nbins']
             bins = np.arange(0, nbins+1, 1)
-            spectrum = rescale_spectrum(self.opened_spectra[file_path]['data'], nbins)
+            spectrum = rescale_spectrum(self.opened_spectra[file_path]['data'], nbins)\
+                  if file_content['data'] is not None else file_content['histogram'][0]
             if self.density is False:
-                hist = self.ax.hist(spectrum*self.opened_spectra[file_path]['fine_gain'], bins=bins, alpha=0.6,\
-                                    label=f'{os.path.basename(file_path)}')
-                self.histograms[file_path] = hist[2]  # Save the patches of the histogram
+                if file_content['data'] is not None:
+                    hist = self.ax.hist(spectrum*self.opened_spectra[file_path]['fine_gain'], bins=bins, alpha=0.6,\
+                                        label=f'{os.path.basename(file_path)}')
+                    self.histograms[file_path] = hist[2]  # Save the patches of the histogram
+                else:
+                    hist = self.ax.stairs(spectrum*file_content['fine_gain'], alpha=0.6,\
+                                                label=f'{os.path.basename(file_name)}')
             else:
-                hist = self.ax.hist(spectrum*self.opened_spectra[file_path]['fine_gain'], bins=bins,\
-                                    alpha=0.6, label=f'{os.path.basename(file_path)}', density=True)
-                self.histograms[file_path] = hist[2]
+                if file_content['data'] is not None:
+                    hist = self.ax.hist(spectrum*self.opened_spectra[file_path]['fine_gain'], bins=bins,\
+                                        alpha=0.6, label=f'{os.path.basename(file_path)}', density=True)
+                    self.histograms[file_path] = hist[2]
+                else:
+                    hist = self.ax.stairs(spectrum*file_content['fine_gain'], alpha=0.6,\
+                                                label=f'{os.path.basename(file_name)}')
 
             # Update legend with custom colors
             handles, labels = self.ax.get_legend_handles_labels()
@@ -370,16 +395,17 @@ class SpectraPlotter(ttk.Window):
             Messagebox.show_error(f"No valid file provided.", "Error")
         if file_path not in self.opened_spectra.keys() and file_path is not None:
             if file_path.endswith('.n42'):
+                data = None
                 histogram = io_utils.import_from_n42(file_path)
-                print(type(histogram))
                 rand = np.random.rand(len(histogram))
                 histogram = histogram.astype(np.float64)
                 histogram += rand
+                histogram = [histogram, np.arange(0, len(histogram)+1, step=1)]
             else:
                 # New file, need to create a new dictionary entry
-                data =  io_utils.import_spectrum(file_path, treename=self.get_treename(file_path))
+                data =  io_utils.import_list(file_path, treename=self.get_treename(file_path))
                 # Creating histogram
-                data =  np.array(io_utils.import_spectrum(file_path, treename=self.get_treename(file_path)))
+                data =  np.array(io_utils.import_list(file_path, treename=self.get_treename(file_path)))
                 # Multiplying every event by a random value in [0,1)
                 rand = np.random.rand(len(data))
                 data = data+rand
@@ -390,7 +416,7 @@ class SpectraPlotter(ttk.Window):
             # Loading calibration factors if present
             m, q = load_calibration_factors(file_path)
             self.opened_spectra[file_path] = {
-                'data': None if file_path.endswith(".n42") else data,
+                'data': data,
                 'nbins': self.nbins,
                 'histogram': histogram,
                 'fine_gain': 1.0,
@@ -429,8 +455,10 @@ class SpectraPlotter(ttk.Window):
         ttk.Label(rebin_window, text="Select Number of Bins:").pack(pady=10)
         file_var.get()
         bins_var = ttk.IntVar(value=self.opened_spectra[file_var.get()]['nbins'])
-        bins_menu = ttk.Combobox(rebin_window, textvariable=bins_var,\
-                                 values=[128, 256, 512, 1024, 2048, 4096, 8192, 16384])
+        bins_values = [128, 256, 512, 1024, 2048, 4096, 8192, 16384]
+        if self.opened_spectra[file_var.get()]['data'] is None:
+            bins_values = bins_values[bins_values < self.opened_spectra[file_var.get()]['nbins']]
+        bins_menu = ttk.Combobox(rebin_window, textvariable=bins_var, values=bins_values)
         bins_menu.pack(pady=10)
 
         def apply_rebin():
@@ -589,7 +617,7 @@ class SpectraPlotter(ttk.Window):
             if self.xscale_unit == 'keV':
                 popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density, calibration_factors=[m, q])
             else:
-                popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density, calibration_factors=None)
+                popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density, calibration_factors=[m, q])
             # Saving 'new' fit results
             rois[roi_index].roi_popt = popt
             rois[roi_index].roi_dpopt = dpopt
@@ -608,7 +636,7 @@ class SpectraPlotter(ttk.Window):
             if self.xscale_unit == 'keV':
                 popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density, calibration_factors=[m, q])
             else:
-                popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density, calibration_factors=None)
+                popt, dpopt = analysis_utils.onselect(hist, xmin, xmax, density=self.density, calibration_factors=[m, q])
             # Saving fit results
             roi.roi_popt = popt
             roi.roi_dpopt = dpopt

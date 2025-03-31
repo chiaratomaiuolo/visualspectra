@@ -61,7 +61,6 @@ def import_from_n42(file_path: str | os.PathLike) -> np.array:
     spectrum = rad_measurement.findall('n42:Spectrum', ns)[0]
     # Getting the bins and content
     channel_data = spectrum.find('.//n42:ChannelData', ns)
-    bins = np.arange(0, 1024+1, step=1)
     spectrum = np.array(list(map(int, (channel_data.text).split())))
 
     return spectrum
@@ -172,9 +171,9 @@ def check_file_format(file_path: str | os.PathLike) -> str:
     else:
         raise ValueError("File format not supported.")
 
-def import_spectrum(file_path: str | os.PathLike, **kwargs) -> Tuple[np.array, np.array]:
-    if file_path.endswith('.n42'):
-        return import_from_n42(file_path)
+def import_list(file_path: str | os.PathLike, **kwargs) -> Tuple[np.array, np.array]:
+    """Import an event list from a file.
+    """
     if file_path.endswith('.txt'):
         return import_from_txt(file_path)
     elif file_path.endswith('.csv'):
@@ -183,4 +182,10 @@ def import_spectrum(file_path: str | os.PathLike, **kwargs) -> Tuple[np.array, n
         return import_from_root(file_path, kwargs.get('treename', 'Data_R'))
     else:
         raise ValueError("File format not supported.")
+    
+def import_spectrum(file_path: str | os.PathLike, **kwargs) -> np.array:
+    """Import a spectrum from a file.
+    """
+    if file_path.endswith('.n42'):
+        return import_from_n42(file_path)
 
