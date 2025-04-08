@@ -816,6 +816,9 @@ class SpectraPlotter(ttk.Window):
                 # Writing header
                 file.write(f'# Source file(s): {self.opened_spectra.keys()}\n')
                 file.write(f'# Date of creation of this .txt file: {date_string}\n')
+                m, q = self.opened_spectra[self.current_file]['calibration_factors']
+                if m is not None and q is not None:
+                    file.write(f'# Calibration factors: m = {m} q = {q}\n')
                 file.write('# ROI ID    xmin    xmax    mu  dmu sigma   dsigma     res FWHM\n')
                 for spectrum_key, spectrum_values in self.opened_spectra.items():
                     file.write(f'# File: {spectrum_key}, fine gain: {spectrum_values["fine_gain"]}\n')
