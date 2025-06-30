@@ -11,5 +11,6 @@ The supported file types (by now) for the events list are:
 - `.root`
 - `.csv`
 - `.txt`
+- `.n42`
 
 
