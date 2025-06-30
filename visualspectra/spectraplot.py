@@ -268,20 +268,22 @@ class SpectraPlotter(ttk.Window):
                             spectrum = analysis_utils.adc_to_kev(spectrum, 1, 0)
                     if self.density is False:
                         if file_content['data'] is not None:
+                            # Case of event list provided
                             hist = self.ax.hist(spectrum*file_content['fine_gain'], bins=bins, alpha=0.6,\
                                                 label=f'{os.path.basename(file_name)}')
                             self.histograms[file_name] = hist[2]  # Save the patches (rectangles) of the histogram
                         else:
+                            # Case of .n42 spectrum file provided
                             hist = self.ax.stairs(spectrum*file_content['fine_gain'], alpha=0.6,\
                                                 label=f'{os.path.basename(file_name)}')
                     else:
                         if file_content['data'] is not None:
                             hist = self.ax.hist(spectrum*file_content['fine_gain'], bins=bins, alpha=0.6,\
-                                                label=f'{os.path.basename(file_name)}')
+                                                density=True, label=f'{os.path.basename(file_name)}')
                             self.histograms[file_name] = hist[2]  # Save the patches (rectangles) of the histogram
                         else:
                             hist = self.ax.stairs(spectrum*file_content['fine_gain'], alpha=0.6,\
-                                                label=f'{os.path.basename(file_name)}')
+                                                density=True, label=f'{os.path.basename(file_name)}')
                 except FileNotFoundError:
                     Messagebox.show_warning(f"File {file_name} not found.", "Warning")
 
@@ -311,7 +313,8 @@ class SpectraPlotter(ttk.Window):
                 return
             nbins = self.opened_spectra[file_path]['nbins']
             bins = np.arange(0, nbins+1, 1)
-            spectrum = rescale_spectrum(self.opened_spectra[file_path]['data'], nbins)\
+            file_content = self.opened_spectra[file_path]
+            spectrum = rescale_spectrum(file_content['data'], nbins)\
                   if file_content['data'] is not None else file_content['histogram'][0]
             if self.density is False:
                 if file_content['data'] is not None:
@@ -328,7 +331,7 @@ class SpectraPlotter(ttk.Window):
                     self.histograms[file_path] = hist[2]
                 else:
                     hist = self.ax.stairs(spectrum*file_content['fine_gain'], alpha=0.6,\
-                                                label=f'{os.path.basename(file_name)}')
+                                                density=True, label=f'{os.path.basename(file_name)}')
 
             # Update legend with custom colors
             handles, labels = self.ax.get_legend_handles_labels()
@@ -816,12 +819,10 @@ class SpectraPlotter(ttk.Window):
                 # Writing header
                 file.write(f'# Source file(s): {self.opened_spectra.keys()}\n')
                 file.write(f'# Date of creation of this .txt file: {date_string}\n')
-                m, q = self.opened_spectra[self.current_file]['calibration_factors']
-                if m is not None and q is not None:
-                    file.write(f'# Calibration factors: m = {m} q = {q}\n')
                 file.write('# ROI ID    xmin    xmax    mu  dmu sigma   dsigma     res FWHM\n')
                 for spectrum_key, spectrum_values in self.opened_spectra.items():
-                    file.write(f'# File: {spectrum_key}, fine gain: {spectrum_values["fine_gain"]}\n')
+                    m, q = spectrum_values['calibration_factors']
+                    file.write(f'# File: {spectrum_key}, fine gain: {spectrum_values["fine_gain"]}, calibration factors: m = {m}, q = {q}\n')
                     for roi in spectrum_values['rois']:
                         # Selecting roi limits and fit results
                         roi_lims = roi.limits
